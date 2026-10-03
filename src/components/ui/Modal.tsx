@@ -36,13 +36,21 @@ export function Modal({
   const titleId = useId();
   const descriptionId = useId();
 
+  // Latest onClose without re-triggering the effect below: callers pass
+  // inline arrows, so depending on `onClose` directly would re-run the
+  // effect (and steal focus back to the panel) on every keystroke.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   useEffect(() => {
     if (!open) return;
 
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
         event.stopPropagation();
-        onClose();
+        onCloseRef.current();
       }
     };
 
@@ -55,7 +63,7 @@ export function Modal({
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
