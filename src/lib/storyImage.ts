@@ -44,7 +44,7 @@ const NAVY: StoryPalette = {
 };
 
 /** Deterministic pseudo-random so every render of the same profile matches. */
-function mulberry32(seed: number): () => number {
+export function mulberry32(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
     state |= 0;
@@ -66,7 +66,7 @@ function loadAvatar(url: string | null): Promise<HTMLImageElement | null> {
   });
 }
 
-function roundRectPath(
+export function roundRectPath(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
@@ -85,7 +85,7 @@ function roundRectPath(
 }
 
 /** Four-point sparkle (like the app's festive backdrop). */
-function sparkle(
+export function sparkle(
   ctx: CanvasRenderingContext2D,
   cx: number,
   cy: number,
@@ -169,7 +169,7 @@ function plus(
 }
 
 /** Shrink text until it fits maxWidth (never smaller than minSize). */
-function fitFont(
+export function fitFont(
   ctx: CanvasRenderingContext2D,
   text: string,
   maxWidth: number,

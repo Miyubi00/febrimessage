@@ -3,17 +3,21 @@ import { useState } from 'react';
 
 import { AdminMessageActions } from '@/components/admin/AdminMessageCard';
 import { ReplyForm } from '@/components/admin/ReplyForm';
+import { ReplyStoryButton } from '@/components/admin/ReplyStoryButton';
 import { StatusBadge, VisibilityBadge } from '@/components/admin/StatusBadge';
 import { AttachmentGrid } from '@/components/messages/AttachmentGrid';
 import { Modal } from '@/components/ui/Modal';
 import { cn, formatDateTime } from '@/lib/utils';
 import type { MessageRow } from '@/types/database';
 import type { MessageWithMeta } from '@/types/message';
+import type { Profile } from '@/types/profile';
 
 interface MessageDetailPanelProps {
   open: boolean;
   item: MessageWithMeta | null;
   ownerName: string;
+  /** Needed for the reply-story artwork (avatar, theme, link). */
+  profile: Profile | null;
   busy?: boolean;
   onClose: () => void;
   onDelete: (item: MessageWithMeta) => void;
@@ -29,6 +33,7 @@ export function MessageDetailPanel({
   open,
   item,
   ownerName,
+  profile,
   busy = false,
   onClose,
   onDelete,
@@ -142,6 +147,9 @@ export function MessageDetailPanel({
           onToggleRead={() => onToggleRead(item)}
           onMarkSpam={() => onMarkSpam(item)}
           onTogglePublic={() => onTogglePublic(item)}
+          storyButton={
+            profile ? <ReplyStoryButton message={message.content} profile={profile} /> : null
+          }
         />
       </div>
     </Modal>

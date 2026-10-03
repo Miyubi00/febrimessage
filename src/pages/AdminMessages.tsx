@@ -250,6 +250,7 @@ export function AdminMessages(): JSX.Element {
                 key={item.message.id}
                 item={item}
                 ownerName={profile?.display_name ?? 'Owner'}
+                profile={profile}
                 selected={detail?.message.id === item.message.id}
                 busy={busyId === item.message.id}
                 onOpenDetail={(selected) => {
@@ -299,6 +300,7 @@ export function AdminMessages(): JSX.Element {
         open={Boolean(detail)}
         item={detail}
         ownerName={profile?.display_name ?? 'Owner'}
+        profile={profile}
         busy={detail ? busyId === detail.message.id : false}
         onClose={() => setDetail(null)}
         onDelete={setPendingDelete}

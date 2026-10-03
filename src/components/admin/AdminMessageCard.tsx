@@ -10,18 +10,22 @@ import {
   Trash2,
   UserRound,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { ReplyForm } from '@/components/admin/ReplyForm';
+import { ReplyStoryButton } from '@/components/admin/ReplyStoryButton';
 import { StatusBadge, VisibilityBadge } from '@/components/admin/StatusBadge';
 import { AttachmentGrid } from '@/components/messages/AttachmentGrid';
 import { cn, formatDateTime, formatShortDate } from '@/lib/utils';
 import type { MessageRow } from '@/types/database';
 import type { MessageWithMeta } from '@/types/message';
+import type { Profile } from '@/types/profile';
 
 interface AdminMessageCardProps {
   item: MessageWithMeta;
   ownerName: string;
+  /** Needed for the reply-story artwork. */
+  profile: Profile | null;
   selected?: boolean;
   busy?: boolean;
   onOpenDetail: (item: MessageWithMeta) => void;
@@ -71,6 +75,7 @@ function ActionButton({
 export function AdminMessageCard({
   item,
   ownerName,
+  profile,
   selected = false,
   busy = false,
   onOpenDetail,
@@ -161,6 +166,9 @@ export function AdminMessageCard({
         onToggleRead={() => onToggleRead(item)}
         onMarkSpam={() => onMarkSpam(item)}
         onTogglePublic={() => onTogglePublic(item)}
+        storyButton={
+          profile ? <ReplyStoryButton message={message.content} profile={profile} /> : null
+        }
       />
 
       {replying ? (
@@ -188,6 +196,8 @@ interface AdminMessageActionsProps {
   onToggleRead: () => void;
   onMarkSpam: () => void;
   onTogglePublic: () => void;
+  /** Optional extra action (eg. the Story sticker button). */
+  storyButton?: ReactNode;
 }
 
 /** Shared moderation action row (used by the card and the detail drawer). */
@@ -200,6 +210,7 @@ export function AdminMessageActions({
   onToggleRead,
   onMarkSpam,
   onTogglePublic,
+  storyButton,
 }: AdminMessageActionsProps): JSX.Element {
   const isUnread = message.status === 'unread';
 
@@ -211,6 +222,7 @@ export function AdminMessageActions({
         onClick={onToggleReply}
         disabled={busy}
       />
+      {storyButton}
       <ActionButton
         label={isUnread ? 'Mark as read' : 'Mark unread'}
         icon={<MailOpen className="h-3.5 w-3.5" aria-hidden="true" />}
