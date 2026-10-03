@@ -1,0 +1,64 @@
+# A string used to prefix all API routes of this project.
+project_id = "anon-message"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = false
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "8MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173"]
+jwt_expiry = 3600
+enable_signup = false
+
+[auth.email]
+enable_signup = false
+double_confirm_changes = true
+enable_confirmations = false
+
+# Edge Functions -------------------------------------------------------------
+# Secrets (SUPABASE_SERVICE_ROLE_KEY, RATE_LIMIT_SECRET, CAPTCHA_SECRET, ...) are
+# provided through `supabase/.env` (never committed) when running
+# `supabase functions serve --env-file .env`.
+
+[functions.submit-message]
+verify_jwt = false
+
+[functions.upload-message-attachment]
+verify_jwt = false
+
+[functions.admin-login]
+verify_jwt = false
+
+[functions.admin-reply]
+verify_jwt = true
+
+[functions.delete-message]
+verify_jwt = true
+
+[functions.notify-test]
+verify_jwt = true
