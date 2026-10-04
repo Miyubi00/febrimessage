@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { useApplyAdminTheme } from '@/hooks/useAdminTheme';
 import { env } from '@/lib/env';
 import { requestPasswordReset } from '@/services/adminService';
 
@@ -25,6 +26,8 @@ interface LocationState {
 export function AdminLogin(): JSX.Element {
   const { admin, loading, error, signIn, clearError } = useAdminAuth();
   const { push } = useToast();
+  // Follow the persisted admin theme (the toggle itself lives in AdminLayout).
+  useApplyAdminTheme();
   const navigate = useNavigate();
   const location = useLocation();
 

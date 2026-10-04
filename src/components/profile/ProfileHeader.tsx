@@ -17,42 +17,37 @@ export function ProfileHeader({ profile, className }: ProfileHeaderProps): JSX.E
   return (
     <section className={cn('relative', className)} aria-label="Profil">
       {/* Cover — supports JPG/PNG/WEBP/GIF, fixed aspect ratio so GIFs cannot break the layout */}
-      <div className="relative aspect-[16/7] w-full overflow-hidden bg-pastel-200 sm:aspect-[16/6]">
+      <div className="relative aspect-[16/6] w-full overflow-hidden sm:aspect-[16/5]">
         {profile.background_url ? (
           <img
             src={profile.background_url}
             alt=""
             aria-hidden="true"
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover [-webkit-mask-image:linear-gradient(to_bottom,black_68%,transparent_98%)] [mask-image:linear-gradient(to_bottom,black_68%,transparent_98%)]"
             // An animated GIF must not shift the layout: the wrapper owns the ratio.
             style={{ objectPosition: 'center' }}
           />
         ) : (
-          <div
-            className="h-full w-full bg-gradient-to-br from-pastel-200 via-pastel-300 to-lavender-light"
-            aria-hidden="true"
-          />
-        )}
-
         <div
-          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-white/70 via-white/10 to-transparent"
+          className="h-full w-full bg-gradient-to-br from-pastel-200 via-pastel-300 to-lavender-light"
           aria-hidden="true"
         />
+        )}
       </div>
 
-      <div className="relative px-5 pb-5 sm:px-7 sm:pb-7">
-        <div className="-mt-14 sm:-mt-16">
+      <div className="relative px-4 pb-4 sm:px-6 sm:pb-5">
+        <div className="relative z-10 -mt-10 sm:-mt-14">
           <Avatar
             src={profile.avatar_url}
             name={profile.display_name}
             size="lg"
             ring
-            className="pastel-glow h-24 w-24 sm:h-28 sm:w-28"
+            className="pastel-glow h-20 w-20 sm:h-24 sm:w-24"
           />
         </div>
 
-        <div className="mt-4">
-          <h1 className="flex flex-wrap items-center gap-2 font-display text-2xl font-extrabold tracking-tight text-ink sm:text-[28px]">
+        <div className="mt-3">
+          <h1 className="flex flex-wrap items-center gap-2 font-display text-xl font-extrabold tracking-tight text-ink sm:text-2xl">
             <span className="break-words">{profile.display_name}</span>
             {profile.is_verified ? <VerifiedBadge title="Profil terverifikasi" /> : null}
           </h1>
@@ -68,7 +63,7 @@ export function ProfileHeader({ profile, className }: ProfileHeaderProps): JSX.E
           </p>
 
           {hasDiscord || hasRoblox ? (
-            <div className="mt-2.5 flex items-center gap-2" aria-label="Tautan sosial">
+            <div className="mt-2 flex items-center gap-2" aria-label="Tautan sosial">
               {hasDiscord ? (
                 <a
                   href={profile.discord_url ?? '#'}
@@ -98,10 +93,10 @@ export function ProfileHeader({ profile, className }: ProfileHeaderProps): JSX.E
           ) : null}
 
           {profile.description ? (
-            <p className="mt-3 max-w-prose text-sm leading-relaxed text-ink-soft">{profile.description}</p>
+            <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink-soft">{profile.description}</p>
           ) : null}
 
-          <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-pastel-100/80 px-3 py-1 text-xs font-semibold text-pastel-800">
+          <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-pastel-100/80 px-3 py-1 text-xs font-semibold text-pastel-800">
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
             Anonymous message box
           </p>

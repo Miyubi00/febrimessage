@@ -46,7 +46,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
           className={cn(
             'w-full resize-none rounded-3xl bg-transparent px-5 py-4 text-sm leading-relaxed text-ink',
             'placeholder:text-ink-muted/70 focus:outline-none',
-            'min-h-[132px]',
+            'min-h-[96px]',
             topRightSlot && 'pr-16',
             'pb-9',
             className,

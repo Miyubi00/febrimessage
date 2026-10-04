@@ -221,11 +221,11 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
   return (
     <form
       onSubmit={handleSubmit}
-      className={cn('surface-soft relative p-5 sm:p-6', className)}
+      className={cn('surface-soft relative flex h-full flex-col p-5 sm:p-6', className)}
       noValidate
     >
       <header className="flex items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-pastel-100 text-pastel-700">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-pastel-100 text-pastel-700 sm:h-11 sm:w-11">
           <Mail className="h-5 w-5" aria-hidden="true" />
         </span>
         <div className="min-w-0">
@@ -248,7 +248,21 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
         />
       </div>
 
-      <div className="mt-5 space-y-4">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={ACCEPT_IMAGE_ATTR}
+        multiple
+        className="sr-only"
+        aria-hidden="true"
+        tabIndex={-1}
+        onChange={(event) => {
+          void handleFiles(event.target.files);
+          event.target.value = '';
+        }}
+      />
+
+      <div className="mt-4 flex flex-1 flex-col justify-between gap-3">
         <Input
           label="Nama anda"
           name="senderName"
@@ -288,18 +302,6 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
           }}
           counter={{ current: contentCount, max: MESSAGE_MAX }}
           error={contentError}
-        />
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={ACCEPT_IMAGE_ATTR}
-          multiple
-          className="sr-only"
-          onChange={(event) => {
-            void handleFiles(event.target.files);
-            event.target.value = '';
-          }}
         />
 
         <div className="flex flex-wrap items-center justify-between gap-2">

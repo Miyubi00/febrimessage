@@ -174,6 +174,35 @@
 }
 
 /* ------------------------------------------------------------------ */
+/* Butterfly wings — scaleX flap around the body (see Butterfly.tsx).  */
+/* ------------------------------------------------------------------ */
+.bfly-wing {
+  transform-box: fill-box;
+  animation-name: bfly-flap;
+  animation-duration: var(--bfly-flap, 0.55s);
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+.bfly-left {
+  transform-origin: 100% 50%;
+}
+
+.bfly-right {
+  transform-origin: 0% 50%;
+}
+
+@keyframes bfly-flap {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0.3);
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Navy theme — dark glass overrides for the public page.              */
 /*                                                                     */
 /* The public layout sets `data-theme="navy"` on its root; everything  */
@@ -181,20 +210,24 @@
 /* Light surfaces become dark navy glass, dark-navy text becomes pale. */
 /* ------------------------------------------------------------------ */
 [data-theme='navy'] .surface {
-  background-color: rgba(15, 26, 60, 0.72);
-  border-color: rgba(126, 160, 255, 0.22);
-  box-shadow: 0 24px 50px -30px rgba(2, 8, 30, 0.9);
+  background-color: rgba(13, 22, 52, 0.8);
+  border-color: rgba(126, 160, 255, 0.24);
+  box-shadow:
+    0 24px 50px -30px rgba(2, 8, 30, 0.9),
+    0 0 60px -18px rgba(56, 189, 248, 0.22);
 }
 
 [data-theme='navy'] .surface-soft {
-  background-color: rgba(15, 26, 60, 0.6);
-  border-color: rgba(126, 160, 255, 0.16);
-  box-shadow: 0 12px 30px -18px rgba(2, 8, 30, 0.9);
+  background-color: rgba(13, 22, 52, 0.68);
+  border-color: rgba(126, 160, 255, 0.18);
+  box-shadow:
+    0 12px 30px -18px rgba(2, 8, 30, 0.9),
+    0 0 44px -16px rgba(56, 189, 248, 0.18);
 }
 
 [data-theme='navy'] .surface-muted {
-  background-color: rgba(10, 19, 48, 0.6);
-  border-color: rgba(126, 160, 255, 0.14);
+  background-color: rgba(9, 17, 42, 0.66);
+  border-color: rgba(126, 160, 255, 0.16);
 }
 
 [data-theme='navy'] .field {
@@ -290,6 +323,10 @@
 [data-theme='navy'] .bg-pastel-100\/80,
 [data-theme='navy'] .bg-pastel-100\/70 {
   background-color: rgba(15, 26, 60, 0.66);
+}
+
+[data-theme='navy'] .bg-white\/95 {
+  background-color: rgba(15, 26, 60, 0.92);
 }
 
 [data-theme='navy'] .border-pastel-100,
@@ -409,4 +446,173 @@
 
 [data-theme='navy'] .checked\:border-pastel-500:checked {
   border-color: #2563eb;
+}
+
+/* ------------------------------------------------------------------ */
+/* Admin dark mode — same dark-glass treatment as the navy public theme,
+/* scoped to `html[data-admin-theme='dark']` (set by useAdminTheme, so    */
+/* portaled modals/lightbox/toasts follow along too).                     */
+/* ------------------------------------------------------------------ */
+html[data-admin-theme='dark'] .surface {
+  background-color: rgba(13, 22, 52, 0.8);
+  border-color: rgba(126, 160, 255, 0.24);
+  box-shadow:
+    0 24px 50px -30px rgba(2, 8, 30, 0.9),
+    0 0 60px -18px rgba(56, 189, 248, 0.22);
+}
+
+html[data-admin-theme='dark'] .surface-soft {
+  background-color: rgba(13, 22, 52, 0.68);
+  border-color: rgba(126, 160, 255, 0.18);
+  box-shadow:
+    0 12px 30px -18px rgba(2, 8, 30, 0.9),
+    0 0 44px -16px rgba(56, 189, 248, 0.18);
+}
+
+html[data-admin-theme='dark'] .surface-muted {
+  background-color: rgba(9, 17, 42, 0.66);
+  border-color: rgba(126, 160, 255, 0.16);
+}
+
+html[data-admin-theme='dark'] .field {
+  background-color: rgba(8, 15, 38, 0.6);
+  border-color: rgba(126, 160, 255, 0.25);
+  color: #eaf1ff;
+  box-shadow: none;
+}
+
+html[data-admin-theme='dark'] .field::placeholder,
+html[data-admin-theme='dark'] .placeholder\:text-ink-muted\/70::placeholder {
+  color: #5e719e;
+}
+
+html[data-admin-theme='dark'] .label-text {
+  color: #b9cbef;
+}
+
+html[data-admin-theme='dark'] .hint-text,
+html[data-admin-theme='dark'] .counter-text {
+  color: #8498c6;
+}
+
+html[data-admin-theme='dark'] .section-title {
+  color: #eaf1ff;
+}
+
+html[data-admin-theme='dark'] .chip {
+  border-color: rgba(126, 160, 255, 0.3);
+  background-color: rgba(94, 168, 255, 0.14);
+  color: #b9cbef;
+}
+
+html[data-admin-theme='dark'] .chip-active {
+  border-color: rgba(126, 160, 255, 0.45);
+  background-color: rgba(94, 168, 255, 0.22);
+  color: #eaf1ff;
+}
+
+html[data-admin-theme='dark'] .skeleton {
+  background-color: rgba(94, 168, 255, 0.12);
+}
+
+html[data-admin-theme='dark'] .skeleton::after {
+  background-image: linear-gradient(
+    90deg,
+    rgba(148, 184, 255, 0) 0%,
+    rgba(148, 184, 255, 0.25) 50%,
+    rgba(148, 184, 255, 0) 100%
+  );
+}
+
+/* Dark-navy text -> pale */
+html[data-admin-theme='dark'] .text-ink {
+  color: #eaf1ff;
+}
+
+html[data-admin-theme='dark'] .text-ink-soft {
+  color: #b9cbef;
+}
+
+html[data-admin-theme='dark'] .text-ink-muted {
+  color: #8498c6;
+}
+
+html[data-admin-theme='dark'] .text-pastel-800 {
+  color: #accdff;
+}
+
+html[data-admin-theme='dark'] .text-pastel-700 {
+  color: #93beff;
+}
+
+html[data-admin-theme='dark'] .text-pastel-600 {
+  color: #7aa9f5;
+}
+
+/* Light surfaces -> dark navy glass */
+html[data-admin-theme='dark'] .bg-white,
+html[data-admin-theme='dark'] .bg-white\/90,
+html[data-admin-theme='dark'] .bg-white\/85,
+html[data-admin-theme='dark'] .bg-white\/80,
+html[data-admin-theme='dark'] .bg-white\/70,
+html[data-admin-theme='dark'] .bg-white\/60,
+html[data-admin-theme='dark'] .bg-white\/50,
+html[data-admin-theme='dark'] .bg-pastel-50,
+html[data-admin-theme='dark'] .bg-pastel-50\/90,
+html[data-admin-theme='dark'] .bg-pastel-50\/80,
+html[data-admin-theme='dark'] .bg-pastel-50\/70,
+html[data-admin-theme='dark'] .bg-pastel-50\/60,
+html[data-admin-theme='dark'] .bg-pastel-100,
+html[data-admin-theme='dark'] .bg-pastel-100\/90,
+html[data-admin-theme='dark'] .bg-pastel-100\/80,
+html[data-admin-theme='dark'] .bg-pastel-100\/70 {
+  background-color: rgba(15, 26, 60, 0.66);
+}
+
+html[data-admin-theme='dark'] .border-pastel-100,
+html[data-admin-theme='dark'] .border-pastel-200,
+html[data-admin-theme='dark'] .border-pastel-200\/70,
+html[data-admin-theme='dark'] .border-pastel-200\/80,
+html[data-admin-theme='dark'] .border-pastel-300 {
+  border-color: rgba(126, 160, 255, 0.22);
+}
+
+/* Hover states stay dark-friendly */
+html[data-admin-theme='dark'] .hover\:bg-pastel-50:hover,
+html[data-admin-theme='dark'] .hover\:bg-pastel-100\/70:hover,
+html[data-admin-theme='dark'] .hover\:bg-pastel-100\/80:hover {
+  background-color: rgba(94, 168, 255, 0.14);
+}
+
+html[data-admin-theme='dark'] .hover\:bg-white:hover {
+  background-color: rgba(30, 48, 100, 0.9);
+}
+
+html[data-admin-theme='dark'] .hover\:text-ink:hover {
+  color: #eaf1ff;
+}
+
+html[data-admin-theme='dark'] .hover\:text-pastel-700:hover,
+html[data-admin-theme='dark'] .hover\:text-pastel-800:hover {
+  color: #c3daff;
+}
+
+html[data-admin-theme='dark'] .hover\:border-pastel-300:hover,
+html[data-admin-theme='dark'] .hover\:border-pastel-400:hover {
+  border-color: rgba(126, 160, 255, 0.45);
+}
+
+/* ------------------------------------------------------------------ */
+
+html[data-admin-theme='dark'] {
+  color-scheme: dark;
+}
+
+html[data-admin-theme='dark'] .bg-white\/95 {
+  background-color: rgba(15, 26, 60, 0.92);
+}
+
+html[data-admin-theme='dark'] .bg-ink\/85 {
+  background-color: rgba(94, 168, 255, 0.16);
+  border: 1px solid rgba(126, 160, 255, 0.3);
 }

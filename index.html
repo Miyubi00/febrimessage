@@ -33,6 +33,18 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Apply the persisted admin theme before first paint (admin routes only,
+      // so the public page never inherits it). useAdminTheme takes over after.
+      try {
+        if (location.pathname.indexOf('/admin') === 0) {
+          document.documentElement.setAttribute(
+            'data-admin-theme',
+            localStorage.getItem('admin-theme') === 'dark' ? 'dark' : 'light',
+          );
+        }
+      } catch (e) {}
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,6 +1,7 @@
 import { Heart, Plus, Send, Sparkles, Star, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { ButterflyField } from '@/components/decor/ButterflyField';
 import { cn } from '@/lib/utils';
 
 interface BackdropTheme {
@@ -225,7 +226,7 @@ function DotGrids({ color }: { color: string }): JSX.Element {
 }
 
 /** Festive animated sky behind the public page — colors follow the profile theme. */
-function FestiveBackdrop({ theme }: { theme: BackdropTheme }): JSX.Element {
+function FestiveBackdrop({ theme, butterflies }: { theme: BackdropTheme; butterflies: boolean }): JSX.Element {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
       <div className={cn('absolute inset-0', theme.wash)} />
@@ -254,6 +255,7 @@ function FestiveBackdrop({ theme }: { theme: BackdropTheme }): JSX.Element {
 
       <FloatingShapes shape={theme.shape} />
       <DotGrids color={theme.grid} />
+      {butterflies ? <ButterflyField /> : null}
 
       {/* Cloud bank along the bottom edge */}
       <span className={cn('absolute -bottom-10 -left-16 h-36 w-96 rounded-full blur-3xl', theme.cloud)} />
@@ -280,16 +282,16 @@ export function PublicLayout({ children, theme }: PublicLayoutProps): JSX.Elemen
   return (
     <div
       data-theme={name}
-      className={cn('relative flex min-h-dvh flex-col overflow-hidden', backdrop.page)}
+      className={cn(
+        'relative flex min-h-dvh flex-col overflow-hidden lg:h-dvh',
+        backdrop.page,
+      )}
     >
-      <FestiveBackdrop theme={backdrop} />
+      <FestiveBackdrop theme={backdrop} butterflies={name === 'navy'} />
 
-      <div className="relative mx-auto w-full max-w-[1200px] flex-1 px-3 pb-14 pt-5 sm:px-6 sm:pt-9">
+      <div className="relative mx-auto flex w-full max-w-[1200px] flex-1 flex-col px-3 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-5 lg:min-h-0 lg:pb-4">
         {children}
       </div>
-
-      <footer className="relative pb-6 text-center">
-      </footer>
     </div>
   );
 }

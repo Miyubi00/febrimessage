@@ -79,19 +79,19 @@ export function PublicProfile(): JSX.Element {
         path="/"
       />
 
-      <div className="grid animate-fade-up items-start gap-5 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:gap-6">
-        <div className="space-y-5">
-          <Card padding="none" className="overflow-hidden">
+      <div className="grid flex-1 animate-fade-up items-stretch gap-4 sm:gap-5 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:gap-5">
+        <div className="no-scrollbar min-w-0 space-y-4 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:overflow-y-auto lg:pb-1">
+          <Card padding="none" className="shrink-0 overflow-hidden">
             <ProfileHeader profile={profile} />
           </Card>
 
-          <Card padding="sm">
+          <Card padding="sm" className="min-h-0 flex-1">
             <MessageForm profile={profile} onSent={refreshMessages} />
           </Card>
         </div>
 
-        <Card padding="md" className="lg:sticky lg:top-6">
-          <header className="mb-4 flex items-center justify-between gap-3">
+        <Card padding="md" className="flex min-h-0 flex-col lg:h-full">
+          <header className="mb-4 flex shrink-0 items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 font-display text-lg font-bold text-ink">
               <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-pastel-100 text-pastel-700">
                 <MessageCircle className="h-4 w-4" aria-hidden="true" />
@@ -101,7 +101,7 @@ export function PublicProfile(): JSX.Element {
             <span className="chip">{threads.length} ditampilkan</span>
           </header>
 
-          <div className="scrollbar-soft max-h-[70vh] overflow-y-auto pr-1 lg:max-h-[calc(100vh-11rem)]">
+          <div className="scrollbar-soft max-h-[70vh] min-h-0 flex-1 overflow-y-auto pr-1 lg:max-h-none">
             <MessageList
               className="space-y-3"
               threads={threads}
