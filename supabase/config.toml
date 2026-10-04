@@ -62,3 +62,15 @@ verify_jwt = true
 
 [functions.notify-test]
 verify_jwt = true
+
+[functions.get-private-message]
+verify_jwt = false
+
+[functions.private-link]
+verify_jwt = true
+
+[functions.sender-reply]
+verify_jwt = false
+
+[functions.subscribe-thread]
+verify_jwt = false

@@ -1,4 +1,4 @@
-import { AlertTriangle, BellRing, Eye, EyeOff, KeyRound, LogOut, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, BellRing, Eye, EyeOff, KeyRound, LogOut, Mail, ShieldCheck } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -10,9 +10,11 @@ import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { toFriendlyMessage } from '@/lib/errors';
-import { validateDiscordWebhookUrl } from '@/lib/validation';
+import { validateDiscordWebhookUrl, validateEmail } from '@/lib/validation';
 import {
+  fetchEmailSettings,
   fetchNotificationSettings,
+  saveEmailSettings,
   saveNotificationSettings,
   sendDiscordTest,
   updatePassword,
@@ -41,6 +43,13 @@ export function AdminSettings(): JSX.Element {
   const [notifLoading, setNotifLoading] = useState(true);
   const [notifSaving, setNotifSaving] = useState(false);
   const [notifTesting, setNotifTesting] = useState(false);
+
+  // Email notifications (Resend): toggle + admin inbox address.
+  const [emailEnabled, setEmailEnabled] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailLoading, setEmailLoading] = useState(true);
+  const [emailSaving, setEmailSaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,6 +113,51 @@ export function AdminSettings(): JSX.Element {
       navigate('/admin/login', { replace: true });
     } finally {
       setSigningOut(false);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchEmailSettings()
+      .then((settings) => {
+        if (cancelled) return;
+        setEmailEnabled(settings.enabled);
+        setAdminEmail(settings.adminEmail);
+      })
+      .catch(() => {
+        if (!cancelled) return;
+      })
+      .finally(() => {
+        if (!cancelled) setEmailLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSaveEmail = async (): Promise<void> => {
+    if (emailSaving) return;
+
+    if (emailEnabled) {
+      const validation = validateEmail(adminEmail);
+      setEmailError(validation);
+      if (validation) return;
+    } else {
+      setEmailError(null);
+    }
+
+    setEmailSaving(true);
+    try {
+      await saveEmailSettings({ enabled: emailEnabled, adminEmail: emailEnabled ? adminEmail : '' });
+      push({ title: 'Pengaturan email tersimpan', variant: 'success' });
+    } catch (caught) {
+      push({
+        title: 'Gagal menyimpan pengaturan',
+        description: toFriendlyMessage(caught, 'Coba lagi sebentar lagi.'),
+        variant: 'error',
+      });
+    } finally {
+      setEmailSaving(false);
     }
   };
 
@@ -273,6 +327,67 @@ export function AdminSettings(): JSX.Element {
                   </p>
                 </div>
               )}
+            </div>
+          )}
+        </Card>
+
+        <Card padding="md">
+          <h2 className="section-title flex items-center gap-2 text-base">
+            <Mail className="h-4 w-4 text-pastel-600" aria-hidden="true" />
+            Notifikasi Email
+          </h2>
+
+          <p className="mt-2 text-xs leading-relaxed text-ink-muted">
+            Kirim email setiap ada pesan baru dan setiap ada balasan admin. Pengiriman lewat Resend —
+            perlu RESEND_API_KEY di server, kalau belum ada email dilewati diam-diam.
+          </p>
+
+          {emailLoading ? (
+            <div className="mt-4 space-y-2" aria-label="Memuat pengaturan email">
+              <div className="skeleton h-5 w-2/3" />
+              <div className="skeleton h-5 w-1/2" />
+            </div>
+          ) : (
+            <div className="mt-4 space-y-4">
+              <Checkbox
+                name="email-enabled"
+                label="Nyalakan notifikasi email"
+                description="Pesan baru → email admin. Balasan admin → email pengirim yang mendaftar."
+                checked={emailEnabled}
+                onChange={(event) => setEmailEnabled(event.target.checked)}
+              />
+
+              <Input
+                label="Email admin"
+                name="adminEmail"
+                type="email"
+                autoComplete="email"
+                placeholder="kamu@contoh.com"
+                value={adminEmail}
+                onChange={(event) => {
+                  setAdminEmail(event.target.value);
+                  setEmailError(null);
+                }}
+                error={emailError}
+                disabled={emailSaving}
+              />
+
+              <div>
+                <Button
+                  onClick={() => void handleSaveEmail()}
+                  loading={emailSaving}
+                  loadingText="Menyimpan…"
+                >
+                  Simpan pengaturan
+                </Button>
+              </div>
+
+              {admin && admin.role !== 'superadmin' ? (
+                <p className="flex items-start gap-2 rounded-3xl border border-pastel-200 bg-pastel-50/70 px-4 py-3 text-xs leading-relaxed text-ink-soft">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-pastel-600" aria-hidden="true" />
+                  Kamu login sebagai admin biasa: hanya superadmin yang bisa mengubah pengaturan ini.
+                </p>
+              ) : null}
             </div>
           )}
         </Card>

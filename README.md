@@ -27,6 +27,11 @@ Stack: **Vite + React 18 + TypeScript + Tailwind CSS + Supabase**
 - **Discord notifications** — every new message posts a dark embed (sender,
   content, sender IP) to a webhook you configure **from the Settings page** — no
   CLI/secret needed; with a "Kirim test" button to verify end to end.
+- **Private / public threads** — every send returns a one-time capability link
+  (`/message/:token`); the admin picks Public or Private when replying and the
+  *whole thread* follows that choice automatically. Only the hash of the token is
+  stored, the raw link is shown once, and it can be revoked/rotated from the
+  message detail panel.
 - **Security** — RLS everywhere, atomic DB-backed rate limits keyed by *hashed*
   IP, admin role read from `admin_profiles` (never a hardcoded email), private
   `message-attachments` bucket served via signed URLs, sender IP stored only in
@@ -57,6 +62,7 @@ Two groups — **never** mix them up:
 | `VITE_CAPTCHA_PROVIDER` | browser | `hcaptcha` \| `turnstile` |
 | `SUPABASE_SERVICE_ROLE_KEY` | functions only | **bypasses RLS — never `VITE_`-prefix it** |
 | `RATE_LIMIT_SECRET` | functions only | salt for IP hashing (min 16 chars) |
+| `PRIVATE_TOKEN_SECRET` | functions only | **optional** salt for private-link hashes (falls back to `RATE_LIMIT_SECRET`) |
 | `CAPTCHA_SECRET` | functions only | provider secret; empty = skip verification |
 | `CAPTCHA_PROVIDER` | functions only | `hcaptcha` \| `turnstile` \| `disabled` |
 | `ALLOWED_ORIGINS` | functions only | comma-separated CORS origins (dev defaults built in) |
@@ -87,6 +93,8 @@ supabase/migrations/
   20260101000006_fix_messages_recursion.sql  # SECURITY DEFINER helper for reply policy (fixes 42P17)
   20260101000007_meta_settings.sql           # message_meta (sender IP) + app_settings (toggles)
   20260101000008_webhook_from_settings.sql   # discord_webhook_url key (configure from Settings)
+  20260101000009_roblox_url.sql              # profiles.roblox_url
+  20260101000010_private_threads.sql         # visibility, thread triggers, private_access, admin RPCs
 ```
 
 2. Create the admin account:
@@ -99,15 +107,47 @@ supabase/migrations/
 3. Deploy the Edge Functions:
 
 ```bash
-supabase functions deploy submit-message upload-message-attachment admin-login admin-reply delete-message notify-test
+supabase functions deploy submit-message upload-message-attachment admin-login admin-reply \
+  delete-message notify-test get-private-message private-link
 supabase secrets set SUPABASE_SERVICE_ROLE_KEY=... RATE_LIMIT_SECRET=... \
   CAPTCHA_SECRET=... CAPTCHA_PROVIDER=hcaptcha \
   ALLOWED_ORIGINS=https://your-site.vercel.app
+# Optional — dedicated salt for private link hashes (falls back to RATE_LIMIT_SECRET):
+# supabase secrets set PRIVATE_TOKEN_SECRET=...
 ```
 
-`submit-message`, `upload-message-attachment` and `admin-login` run with
-`verify_jwt = false` (they serve anonymous visitors); `admin-reply`,
-`delete-message` and `notify-test` require a signed-in admin JWT.
+`submit-message`, `upload-message-attachment`, `admin-login` and
+`get-private-message` run with `verify_jwt = false` (they serve anonymous
+visitors); `admin-reply`, `delete-message`, `private-link` and `notify-test`
+require a signed-in admin JWT.
+
+## Private threads (public / private visibility)
+
+Flow:
+
+```
+sender  → submit-message
+            · creates the root with visibility = 'private'
+            · mints a 32-byte token, stores SHA-256(token + secret) only
+            · returns the RAW token exactly once → success panel → Salin link
+sender  → /message/:token  → get-private-message (rate limited 10/min + 60/h)
+            · hashes the token, matches private_access, checks revoked_at
+            · returns ONLY thread content + 5-minute signed attachment URLs
+admin   → ReplyForm: ( ) Public  ( ) Private
+            · admin-reply sets the ROOT's visibility first, the reply inherits
+            · toggling later moves root + reply together (RPC)
+```
+
+Security rules implemented:
+
+- `private_access` has RLS enabled with **no policies** — the browser can never
+  read the hash; only Edge Functions (service role) touch it.
+- Invalid, revoked and unknown tokens all return the same generic
+  *"Pesan tidak ditemukan atau link sudah tidak valid."* (404, no probing).
+- Public page / RLS / storage policies filter `visibility = 'public'` **in the
+  database** — private rows are never sent to a public browser.
+- Admin sees status via `admin_private_link_status` (booleans + timestamps only)
+  and can **Revoke link** / **Buat link baru** (new token shown once).
 
 ## Discord notifications (new-message alerts)
 
@@ -132,8 +172,9 @@ Notes:
 
 ```
 visitor → MessageForm → upload-message-attachment (validates + stores image)
-        → submit-message (rate limit → captcha → duplicate check → INSERT)
-        → public/messages               (RLS: only is_public = true is readable)
+        → submit-message (rate limit → captcha → token mint → INSERT)
+        → /message/:token  (private link; signed URLs, 5 min)
+        → public feed       (RLS: only visibility = 'public' is readable)
 
 admin   → /admin/login (admin-login fn, IP rate limited, role from admin_profiles)
         → inbox (RLS: authenticated + is_admin())

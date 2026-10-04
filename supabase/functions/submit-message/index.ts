@@ -14,7 +14,9 @@ import { getAppSetting, resolveDiscordWebhookUrl, serviceClient } from '../_shar
 import { verifyCaptcha } from '../_shared/captcha.ts';
 import { preflight } from '../_shared/cors.ts';
 import { sendDiscordNotification } from '../_shared/discord.ts';
+import { emailShell, escapeHtml, isPlausibleEmail, sendEmail } from '../_shared/email.ts';
 import { clientIp, hashIp, hashUserAgent } from '../_shared/ipHash.ts';
+import { generatePrivateToken, hashPrivateToken } from '../_shared/privateToken.ts';
 import { enforceRateLimit } from '../_shared/rateLimit.ts';
 import {
   apiError,
@@ -83,9 +85,11 @@ async function resolveAttachment(
   };
 }
 
-// Limits: 5 submits / 60s and 50 submits / 24h per hashed IP.
+// Limits (spec 62): 5 / 60s, 20 / hour and 50 / 24h per hashed IP.
 const SUBMIT_BURST_LIMIT = 5;
 const SUBMIT_BURST_WINDOW = 60;
+const SUBMIT_HOURLY_LIMIT = 20;
+const SUBMIT_HOURLY_WINDOW = 60 * 60;
 const SUBMIT_DAILY_LIMIT = 50;
 const SUBMIT_DAILY_WINDOW = 24 * 60 * 60;
 
@@ -125,6 +129,15 @@ Deno.serve(async (request: Request): Promise<Response> => {
       message: 'Terlalu banyak pesan dikirim. Coba lagi nanti.',
     });
     if (burst) return burst;
+
+    const hourly = await enforceRateLimit(request, client, {
+      ipHash,
+      action: 'submit_message_hourly',
+      limit: SUBMIT_HOURLY_LIMIT,
+      windowSeconds: SUBMIT_HOURLY_WINDOW,
+      message: 'Batas pengiriman per jam tercapai. Coba lagi nanti.',
+    });
+    if (hourly) return hourly;
 
     const daily = await enforceRateLimit(request, client, {
       ipHash,
@@ -226,6 +239,11 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
     const userAgentHash = await hashUserAgent(request);
 
+    // A new thread starts PRIVATE/unlisted: the admin decides the final
+    // visibility when replying (Public = shown on the profile page, Private =
+    // only reachable through this sender's private link). The DB default for
+    // `visibility` is 'public'; we set 'private' explicitly so nothing is
+    // published before the owner reviews it.
     const { data: inserted, error: insertError } = await client
       .from('messages')
       .insert({
@@ -234,7 +252,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
         is_anonymous: isAnonymous,
         content,
         status: 'unread',
-        is_public: false,
+        visibility: 'private',
         parent_id: null,
         ip_hash: ipHash,
         user_agent_hash: userAgentHash,
@@ -279,6 +297,29 @@ Deno.serve(async (request: Request): Promise<Response> => {
       console.error('[submit-message] message_meta upsert failed:', metaError.message);
     }
 
+    // Private access token (spec 44): the raw token is returned ONCE to the
+    // sender; only its hash is persisted. This is what lets someone with no
+    // account come back later and read the owner's reply.
+    let privateToken: string | null = null;
+    try {
+      privateToken = generatePrivateToken();
+      const tokenHash = await hashPrivateToken(privateToken);
+      const { error: tokenError } = await client
+        .from('private_access')
+        .insert({ message_id: inserted.id as string, token_hash: tokenHash });
+
+      if (tokenError) {
+        console.error('[submit-message] private token insert failed:', tokenError.message);
+        privateToken = null;
+      }
+    } catch (tokenSetupError) {
+      console.error(
+        '[submit-message] private token setup threw:',
+        tokenSetupError instanceof Error ? tokenSetupError.message : tokenSetupError,
+      );
+      privateToken = null;
+    }
+
     // Discord notification — best effort, never blocks the response. The raw IP
     // travels in-memory only; it is never part of the HTTP response.
     try {
@@ -305,10 +346,37 @@ Deno.serve(async (request: Request): Promise<Response> => {
       );
     }
 
+    // Admin email notification — best effort, never blocks the response.
+    try {
+      const emailEnabled =
+        (await getAppSetting(client, 'email_notifications_enabled', 'false')).trim().toLowerCase() === 'true';
+      const adminEmail = (await getAppSetting(client, 'admin_notify_email', '')).trim();
+      if (emailEnabled && isPlausibleEmail(adminEmail)) {
+        const senderLabel = isAnonymous ? 'Anonymous' : (senderName || 'Anonymous');
+        const sent = await sendEmail({
+          to: adminEmail,
+          subject: `Pesan anonim baru dari ${senderLabel}`,
+          html: emailShell(
+            'Pesan anonim baru',
+            `<p><strong>${escapeHtml(senderLabel)}</strong> baru saja mengirim pesan. Buka inbox admin untuk membaca dan membalasnya.</p>` +
+              `<blockquote style="border-left:3px solid #A9D8FF;padding-left:12px;color:#3D5A80">${escapeHtml(content.slice(0, 300))}</blockquote>`,
+          ),
+        });
+        console.log(`[submit-message] admin email notify: ${sent ? 'sent' : 'skipped'}`);
+      }
+    } catch (emailError) {
+      console.error(
+        '[submit-message] admin email notify threw:',
+        emailError instanceof Error ? emailError.message : emailError,
+      );
+    }
+
     return json(request, {
       id: inserted.id as string,
       created_at: inserted.created_at as string,
       status: inserted.status as string,
+      // Raw token, returned exactly once. Never logged.
+      private_token: privateToken,
     });
   } catch (error) {
     console.error(

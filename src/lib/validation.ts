@@ -106,6 +106,15 @@ export function validateMessageContent(value: string, max = MESSAGE_MAX): string
   if (countChars(candidate) > max) return `Pesan maksimal ${max} karakter.`;
   return null;
 }
+/** Email address for notifications (empty allowed = no notifications). */
+export function validateEmail(value: string): string | null {
+  const candidate = value.trim();
+  if (!candidate) return null;
+  if (candidate.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidate)) {
+    return 'Alamat email tidak valid.';
+  }
+  return null;
+}
 
 export function validateDiscordUrl(value: string): string | null {
   const candidate = value.trim();

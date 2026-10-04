@@ -15,10 +15,10 @@ import { useAdminOutlet } from '@/pages/AdminDashboard';
 import {
   deleteMessage,
   fetchAdminMessages,
-  setMessageVisibility,
+  setThreadVisibility,
   updateMessageStatus,
 } from '@/services/adminService';
-import type { MessageRow, MessageStatus } from '@/types/database';
+import type { MessageRow, MessageStatus, MessageVisibility } from '@/types/database';
 import type {
   AdminMessageQuery,
   MessageFilterStatus,
@@ -51,6 +51,11 @@ export function AdminMessages(): JSX.Element {
   const [detail, setDetail] = useState<MessageWithMeta | null>(null);
   const [pendingDelete, setPendingDelete] = useState<MessageWithMeta | null>(null);
   const [deleting, setDeleting] = useState(false);
+  /** Visibility change awaiting confirmation (spec 52). */
+  const [pendingVisibility, setPendingVisibility] = useState<{
+    item: MessageWithMeta;
+    next: MessageVisibility;
+  } | null>(null);
 
   // Debounce the search box so we do not hit the API on every keystroke.
   useEffect(() => {
@@ -153,11 +158,19 @@ export function AdminMessages(): JSX.Element {
   };
 
   const handleTogglePublic = (item: MessageWithMeta): void => {
-    const next = !item.message.is_public;
+    // Ask first: changing visibility moves the WHOLE thread (spec 52).
+    const next: MessageVisibility = item.message.visibility === 'public' ? 'private' : 'public';
+    setPendingVisibility({ item, next });
+  };
+
+  const confirmVisibility = (): void => {
+    if (!pendingVisibility) return;
+    const { item, next } = pendingVisibility;
+    setPendingVisibility(null);
     void runAction(
       item,
-      () => setMessageVisibility(item.message.id, next),
-      next ? 'Pesan dipublikasikan' : 'Pesan disembunyikan',
+      () => setThreadVisibility(item.message.id, next),
+      next === 'public' ? 'Thread dipublikasikan' : 'Thread dijadikan private',
     );
   };
 
@@ -318,6 +331,21 @@ export function AdminMessages(): JSX.Element {
         loading={deleting}
         onConfirm={() => void confirmDelete()}
         onCancel={() => setPendingDelete(null)}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingVisibility)}
+        title={
+          pendingVisibility?.next === 'public' ? 'Ubah pesan menjadi publik?' : 'Ubah pesan menjadi private?'
+        }
+        description={
+          pendingVisibility?.next === 'public'
+            ? 'Pesan dan balasannya dapat dilihat oleh pengunjung profile.'
+            : 'Pesan ini hanya dapat dilihat oleh pengirim menggunakan private message link.'
+        }
+        confirmLabel={pendingVisibility?.next === 'public' ? 'Jadikan publik' : 'Jadikan private'}
+        onConfirm={confirmVisibility}
+        onCancel={() => setPendingVisibility(null)}
       />
     </>
   );

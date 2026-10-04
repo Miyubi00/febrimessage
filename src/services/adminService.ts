@@ -1,13 +1,20 @@
 import { AppError, invokeEdge, logDevError } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 import { validateDiscordWebhookUrl } from '@/lib/validation';
-import type { AdminRole, MessageAttachmentRow, MessageRow, MessageStatus } from '@/types/database';
+import type {
+  AdminRole,
+  MessageAttachmentRow,
+  MessageRow,
+  MessageStatus,
+  MessageVisibility,
+} from '@/types/database';
 import type {
   AdminMessagePage,
   AdminMessageQuery,
   AdminReplyInput,
   DeleteMessageResult,
   MessageWithMeta,
+  PrivateLinkStatus,
 } from '@/types/message';
 
 /** Hard cap so a single request can never pull an unbounded number of rows. */
@@ -140,13 +147,14 @@ export async function fetchAdminMessages(query: AdminMessageQuery): Promise<Admi
 
   const items = rootRows.map<MessageWithMeta>((row) => {
     const threadReplies = repliesByParent.get(row.id) ?? [];
-    const lastReply = threadReplies.length > 0 ? threadReplies[threadReplies.length - 1] : undefined;
 
     return {
       message: row,
       attachments: attachmentsByMessage.get(row.id) ?? [],
-      reply: lastReply ?? null,
-      replyAttachments: lastReply ? (attachmentsByMessage.get(lastReply.id) ?? []) : [],
+      replies: threadReplies.map((reply) => ({
+        reply,
+        attachments: attachmentsByMessage.get(reply.id) ?? [],
+      })),
       senderIp: senderIpByMessage.get(row.id) ?? null,
     };
   });
@@ -303,21 +311,75 @@ export async function updateMessageStatus(id: string, status: MessageStatus): Pr
   }
 }
 
-export async function setMessageVisibility(id: string, isPublic: boolean): Promise<void> {
-  const { error } = await supabase.from('messages').update({ is_public: isPublic }).eq('id', id);
+/**
+ * Change a thread's visibility (spec 52). Runs server-side through
+ * `set_thread_visibility` so the root and its reply move together atomically —
+ * a thread can never end up half-visible. Any admin may call it (RLS-guarded in
+ * the RPC); non-admins get a friendly error.
+ */
+export async function setThreadVisibility(messageId: string, visibility: MessageVisibility): Promise<void> {
+  const { error } = await supabase.rpc('set_thread_visibility', {
+    p_message_id: messageId,
+    p_visibility: visibility,
+  });
+
   if (error) {
-    logDevError('adminService.setMessageVisibility', error);
+    logDevError('adminService.setThreadVisibility', error);
     throw new AppError('Gagal memperbarui visibilitas pesan.', 'VISIBILITY_UPDATE_FAILED');
   }
 }
 
 /** Reply through the `admin-reply` Edge Function (server verifies the role). */
 export async function replyToMessage(input: AdminReplyInput): Promise<MessageRow> {
-  const result = await invokeEdge<{ reply: MessageRow }>('admin-reply', {
+  const result = await invokeEdge<{ reply: MessageRow; visibility: MessageVisibility }>('admin-reply', {
     messageId: input.messageId,
     content: input.content,
+    visibility: input.visibility ?? 'public',
   });
   return result.reply;
+}
+
+/* ------------------------------------------------------------------ */
+/* Private links (spec 60) — revoke/rotate state + actions             */
+/*                                                                     */
+/* Status is exposed through `admin_private_link_status`, which returns */
+/* only booleans/timestamps. The hash and the raw token never reach an  */
+/* admin browser.                                                       */
+/* ------------------------------------------------------------------ */
+
+/** Whether this thread currently has a working private link. */
+export async function fetchPrivateLinkStatus(messageId: string): Promise<PrivateLinkStatus> {
+  const { data, error } = await supabase.rpc('admin_private_link_status', {
+    p_message_id: messageId,
+  });
+
+  if (error) {
+    logDevError('adminService.fetchPrivateLinkStatus', error);
+    throw new AppError('Gagal memuat status private link.', 'PRIVATE_LINK_STATUS_FAILED');
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    hasToken: Boolean(row?.has_token),
+    createdAt: (row?.created_at as string | null) ?? null,
+    revokedAt: (row?.revoked_at as string | null) ?? null,
+  };
+}
+
+/**
+ * Revoke a thread's private link (old URL dies instantly) or mint a fresh one.
+ * `rotate` returns the raw token to show ONCE in the admin panel.
+ */
+export async function managePrivateLink(
+  messageId: string,
+  action: 'revoke' | 'rotate',
+): Promise<{ token: string | null }> {
+  const result = await invokeEdge<{ ok: boolean; action: string; token?: string }>('private-link', {
+    messageId,
+    action,
+  });
+  if (!result.ok) throw new AppError('Gagal memproses private link.', 'PRIVATE_LINK_FAILED');
+  return { token: result.token ?? null };
 }
 
 /** Delete through the `delete-message` Edge Function (also cleans up Storage). */
@@ -405,6 +467,54 @@ export async function sendDiscordTest(webhookUrl?: string): Promise<string> {
     ...(webhookUrl ? { webhookUrl } : {}),
   });
   return result.status;
+}
+
+/* ------------------------------------------------------------------ */
+/* Email notification settings (superadmin writes, admin reads)        */
+/* ------------------------------------------------------------------ */
+export interface EmailSettings {
+  enabled: boolean;
+  /** Admin inbox address for "new message" emails (empty = unset). */
+  adminEmail: string;
+}
+
+/** Read the email notification toggle + admin address (admin session required by RLS). */
+export async function fetchEmailSettings(): Promise<EmailSettings> {
+  const { data, error } = await supabase.from('app_settings').select('key, value').in('key', [
+    'email_notifications_enabled',
+    'admin_notify_email',
+  ]);
+
+  if (error) {
+    logDevError('adminService.fetchEmailSettings', error);
+    throw new AppError('Gagal memuat pengaturan email.', 'SETTINGS_FETCH_FAILED');
+  }
+
+  const byKey = new Map((data ?? []).map((row) => [row.key, row.value]));
+  return {
+    enabled: parseBooleanSetting(byKey.get('email_notifications_enabled') ?? null, false),
+    adminEmail: byKey.get('admin_notify_email') ?? '',
+  };
+}
+
+/**
+ * Save the email notification settings. Only superadmins can write (RLS);
+ * everyone else gets a friendly error. Sending itself needs RESEND_API_KEY
+ * + EMAIL_FROM as Edge Function secrets (see .env.example).
+ */
+export async function saveEmailSettings(settings: EmailSettings): Promise<void> {
+  const { error } = await supabase.from('app_settings').upsert([
+    { key: 'email_notifications_enabled', value: settings.enabled ? 'true' : 'false' },
+    { key: 'admin_notify_email', value: settings.adminEmail.trim() },
+  ]);
+
+  if (error) {
+    logDevError('adminService.saveEmailSettings', error);
+    throw new AppError(
+      'Gagal menyimpan. Hanya superadmin yang boleh mengubah pengaturan ini.',
+      'SETTINGS_SAVE_FAILED',
+    );
+  }
 }
 
 /* ------------------------------------------------------------------ */

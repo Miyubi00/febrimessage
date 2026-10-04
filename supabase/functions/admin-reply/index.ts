@@ -1,12 +1,12 @@
 /**
  * Edge Function: `admin-reply`
  *
- * Stores the admin's reply as a child message (`parent_id = messageId`) so the
- * public thread can render it. Only one reply per message is enforced; replying
- * twice replaces the previous reply instead of piling up rows.
+ * Stores the admin's reply as a child message (`parent_id` = thread root).
+ * Replies append — threads are sender <-> admin conversations.
  */
-import { canManageProfile, requireAdmin, serviceClient } from '../_shared/clients.ts';
+import { canManageProfile, getAppSetting, requireAdmin, serviceClient } from '../_shared/clients.ts';
 import { preflight } from '../_shared/cors.ts';
+import { emailShell, escapeHtml, isPlausibleEmail, sendEmail } from '../_shared/email.ts';
 import { hashActor } from '../_shared/ipHash.ts';
 import { enforceRateLimit } from '../_shared/rateLimit.ts';
 import { apiError, asString, json, methodNotAllowed, readJsonBody } from '../_shared/responses.ts';
@@ -79,55 +79,46 @@ Deno.serve(async (request: Request): Promise<Response> => {
       return apiError(request, 403, 'FORBIDDEN', 'Kamu tidak punya akses ke pesan ini.');
     }
 
-    // One reply per message: replace the existing reply instead of duplicating.
-    const { data: existing, error: existingError } = await client
-      .from('messages')
-      .select('id')
-      .eq('parent_id', messageId)
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle();
+    // Visibility describes the whole THREAD (spec 50/51), not just the reply.
+    // Default is public; anything unrecognised falls back to public as well.
+    const visibility =
+      asString(body.visibility, 16).trim().toLowerCase() === 'private' ? 'private' : 'public';
 
-    if (existingError) {
-      console.error('[admin-reply] existing reply lookup failed:', existingError.message);
+    // Set it on the root FIRST so a freshly inserted reply inherits the new
+    // value through the `messages_enforce_thread` trigger, and so existing
+    // replies are pushed by `messages_propagate_visibility`.
+    const { error: visibilityError } = await client
+      .from('messages')
+      .update({ visibility })
+      .eq('id', messageId);
+
+    if (visibilityError) {
+      console.error('[admin-reply] visibility update failed:', visibilityError.message);
       return apiError(request, 500, 'REPLY_FAILED', 'Gagal mengirim balasan. Coba lagi.');
     }
 
-    let reply;
-    if (existing) {
-      const { data: updated, error: updateError } = await client
-        .from('messages')
-        .update({ content, status: 'read' })
-        .eq('id', (existing as { id: string }).id)
-        .select('*')
-        .single();
+    // Replies append: threads are sender <-> admin conversations, so every
+    // admin reply is a new row (the old replace-in-place behaviour is gone).
+    const { data: created, error: createError } = await client
+      .from('messages')
+      .insert({
+        profile_id: parent.profile_id as string,
+        parent_id: messageId,
+        sender_name: null,
+        is_anonymous: false,
+        content,
+        status: 'read',
+        author: 'admin',
+        // visibility is enforced by the thread trigger (inherits the root).
+      })
+      .select('*')
+      .single();
 
-      if (updateError || !updated) {
-        console.error('[admin-reply] reply update failed:', updateError?.message);
-        return apiError(request, 500, 'REPLY_FAILED', 'Gagal mengirim balasan. Coba lagi.');
-      }
-      reply = updated;
-    } else {
-      const { data: created, error: createError } = await client
-        .from('messages')
-        .insert({
-          profile_id: parent.profile_id as string,
-          parent_id: messageId,
-          sender_name: null,
-          is_anonymous: false,
-          content,
-          status: 'read',
-          is_public: false,
-        })
-        .select('*')
-        .single();
-
-      if (createError || !created) {
-        console.error('[admin-reply] reply insert failed:', createError?.message);
-        return apiError(request, 500, 'REPLY_FAILED', 'Gagal mengirim balasan. Coba lagi.');
-      }
-      reply = created;
+    if (createError || !created) {
+      console.error('[admin-reply] reply insert failed:', createError?.message);
+      return apiError(request, 500, 'REPLY_FAILED', 'Gagal mengirim balasan. Coba lagi.');
     }
+    const reply = created;
 
     // Reading it in the inbox to reply implies the admin has seen the message.
     const { error: readError } = await client
@@ -140,7 +131,41 @@ Deno.serve(async (request: Request): Promise<Response> => {
       console.error('[admin-reply] mark-read failed:', readError.message);
     }
 
-    return json(request, { reply });
+    // Sender email notification — best effort, never blocks the response.
+    // Only the subscribed address (if any) is notified; the link itself is
+    // never included because only its hash is stored server-side.
+    try {
+      const emailEnabled =
+        (await getAppSetting(client, 'email_notifications_enabled', 'false')).trim().toLowerCase() === 'true';
+      if (emailEnabled) {
+        const { data: subscription } = await client
+          .from('thread_subscriptions')
+          .select('email')
+          .eq('message_id', messageId)
+          .maybeSingle();
+
+        const address = (subscription?.email as string | undefined ?? '').trim();
+        if (isPlausibleEmail(address)) {
+          const sent = await sendEmail({
+            to: address,
+            subject: 'Ada balasan baru untuk pesan anonimmu',
+            html: emailShell(
+              'Ada balasan baru',
+              '<p>Pemilik profile baru saja membalas pesan anonimmu. Buka link private-mu untuk membaca balasannya.</p>' +
+                `<blockquote style="border-left:3px solid #A9D8FF;padding-left:12px;color:#3D5A80">${escapeHtml(content.slice(0, 300))}</blockquote>`,
+            ),
+          });
+          console.log(`[admin-reply] sender email notify: ${sent ? 'sent' : 'skipped'}`);
+        }
+      }
+    } catch (emailError) {
+      console.error(
+        '[admin-reply] sender email notify threw:',
+        emailError instanceof Error ? emailError.message : emailError,
+      );
+    }
+
+    return json(request, { reply, visibility });
   } catch (error) {
     console.error(
       '[admin-reply] unexpected error:',

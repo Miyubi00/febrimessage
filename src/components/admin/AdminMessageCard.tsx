@@ -5,18 +5,20 @@ import {
   EyeOff,
   Globe,
   MailOpen,
+  MoreHorizontal,
   Reply,
   ShieldAlert,
   Trash2,
   UserRound,
 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { ReplyForm } from '@/components/admin/ReplyForm';
 import { ReplyStoryButton } from '@/components/admin/ReplyStoryButton';
-import { StatusBadge, VisibilityBadge } from '@/components/admin/StatusBadge';
+import { PrivateLinkBadge, StatusBadge, VisibilityBadge, type PrivateLinkState } from '@/components/admin/StatusBadge';
 import { AttachmentGrid } from '@/components/messages/AttachmentGrid';
 import { cn, formatDateTime, formatShortDate } from '@/lib/utils';
+import { fetchPrivateLinkStatus } from '@/services/adminService';
 import type { MessageRow } from '@/types/database';
 import type { MessageWithMeta } from '@/types/message';
 import type { Profile } from '@/types/profile';
@@ -86,8 +88,28 @@ export function AdminMessageCard({
   onReplied,
 }: AdminMessageCardProps): JSX.Element {
   const [replying, setReplying] = useState(false);
-  const { message, attachments, reply, replyAttachments, senderIp } = item;
+  const { message, attachments, replies, senderIp } = item;
+  const lastReply = replies.length > 0 ? replies[replies.length - 1] : null;
   const senderLabel = message.is_anonymous ? 'Anonymous' : (message.sender_name ?? 'Anonymous');
+
+  // Link status is shown directly (no need to open anything) — same rule as
+  // the detail modal: active only with a live token.
+  const [linkState, setLinkState] = useState<PrivateLinkState | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchPrivateLinkStatus(message.id)
+      .then((status) => {
+        if (!cancelled) {
+          setLinkState(status.revokedAt ? 'revoked' : status.hasToken ? 'active' : 'none');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLinkState(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [message.id]);
 
   return (
     <article
@@ -114,13 +136,14 @@ export function AdminMessageCard({
           <p className="truncate text-sm font-bold text-ink">{senderLabel}</p>
           <p className="text-[11px] text-ink-muted">
             {formatDateTime(message.created_at)}
-            {reply ? ` • dibalas ${formatShortDate(reply.created_at)}` : ''}
+            {lastReply ? ` • dibalas ${formatShortDate(lastReply.reply.created_at)}` : ''}
           </p>
         </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
           <StatusBadge status={message.status} />
-          <VisibilityBadge isPublic={message.is_public} />
+          <VisibilityBadge visibility={message.visibility} />
+          {linkState ? <PrivateLinkBadge state={linkState} /> : null}
         </div>
       </header>
 
@@ -146,14 +169,15 @@ export function AdminMessageCard({
 
       <AttachmentGrid attachments={attachments} size="sm" className="mt-3" />
 
-      {reply ? (
+      {lastReply ? (
         <div className="mt-3 border-l-2 border-pastel-300 pl-3">
           <p className="flex items-center gap-1.5 text-[11px] font-bold text-pastel-800">
             <CornerDownRight className="h-3 w-3" aria-hidden="true" />
-            Reply from {ownerName}
+            Reply from {lastReply.reply.author === 'admin' ? ownerName : senderLabel}
+            {replies.length > 1 ? ` • ${replies.length} balasan` : ''}
           </p>
-          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-ink-soft">{reply.content}</p>
-          <AttachmentGrid attachments={replyAttachments} size="sm" className="mt-2" />
+          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-ink-soft">{lastReply.reply.content}</p>
+          <AttachmentGrid attachments={lastReply.attachments} size="sm" className="mt-2" />
         </div>
       ) : null}
 
@@ -175,6 +199,7 @@ export function AdminMessageCard({
         <ReplyForm
           className="mt-3 rounded-3xl bg-pastel-50/80 p-3"
           messageId={message.id}
+          defaultVisibility={message.visibility}
           autoFocus
           onCancel={() => setReplying(false)}
           onReplied={(newReply) => {
@@ -198,6 +223,33 @@ interface AdminMessageActionsProps {
   onTogglePublic: () => void;
   /** Optional extra action (eg. the Story sticker button). */
   storyButton?: ReactNode;
+  /** Extra content appended inside the ⋯ menu (eg. private-link status). */
+  moreItems?: ReactNode;
+}
+
+/** One row inside the ⋯ overflow menu. */
+function MenuItem({
+  label,
+  icon,
+  onClick,
+  disabled,
+}: {
+  label: string;
+  icon: JSX.Element;
+  onClick: () => void;
+  disabled?: boolean;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-left text-xs font-semibold text-ink-soft transition hover:bg-pastel-50 hover:text-ink disabled:opacity-50"
+    >
+      {icon}
+      {label}
+    </button>
+  );
 }
 
 /** Shared moderation action row (used by the card and the detail drawer). */
@@ -211,11 +263,16 @@ export function AdminMessageActions({
   onMarkSpam,
   onTogglePublic,
   storyButton,
+  moreItems,
 }: AdminMessageActionsProps): JSX.Element {
   const isUnread = message.status === 'unread';
+  const isPublic = message.visibility === 'public';
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const closeMenu = (): void => setMenuOpen(false);
 
   return (
-    <footer className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-pastel-100 pt-3">
+    <footer className="relative mt-3 flex flex-wrap items-center gap-1.5 border-t border-pastel-100 pt-3">
       <ActionButton
         label={replying ? 'Tutup balasan' : 'Reply'}
         icon={<Reply className="h-3.5 w-3.5" aria-hidden="true" />}
@@ -224,21 +281,9 @@ export function AdminMessageActions({
       />
       {storyButton}
       <ActionButton
-        label={isUnread ? 'Mark as read' : 'Mark unread'}
-        icon={<MailOpen className="h-3.5 w-3.5" aria-hidden="true" />}
-        onClick={onToggleRead}
-        disabled={busy}
-      />
-      <ActionButton
-        label="Report"
-        icon={<ShieldAlert className="h-3.5 w-3.5" aria-hidden="true" />}
-        onClick={onMarkSpam}
-        disabled={busy}
-      />
-      <ActionButton
-        label={message.is_public ? 'Hide' : 'Publish'}
+        label={isPublic ? 'Hide' : 'Publish'}
         icon={
-          message.is_public ? (
+          isPublic ? (
             <EyeOff className="h-3.5 w-3.5" aria-hidden="true" />
           ) : (
             <Eye className="h-3.5 w-3.5" aria-hidden="true" />
@@ -254,6 +299,55 @@ export function AdminMessageActions({
         disabled={busy}
         tone="danger"
       />
+
+      <div>
+        <button
+          type="button"
+          onClick={() => setMenuOpen((value) => !value)}
+          disabled={busy}
+          aria-label="Pengaturan lainnya"
+          aria-expanded={menuOpen}
+          title="Pengaturan lainnya"
+          className="inline-flex items-center justify-center rounded-2xl border border-pastel-200 bg-white px-2.5 py-1.5 text-ink-soft transition hover:border-pastel-400 disabled:opacity-50"
+        >
+          <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+
+        {menuOpen ? (
+          <>
+            <button
+              type="button"
+              aria-hidden="true"
+              tabIndex={-1}
+              onClick={closeMenu}
+              className="fixed inset-0 z-10 cursor-default"
+            />
+            <div className="absolute inset-x-0 bottom-full z-20 mb-2 max-h-[70dvh] overflow-y-auto rounded-3xl border border-pastel-200 bg-white shadow-card sm:left-auto sm:w-64">
+              <div className="p-1.5">
+                <MenuItem
+                  label={isUnread ? 'Mark as read' : 'Mark unread'}
+                  icon={<MailOpen className="h-3.5 w-3.5" aria-hidden="true" />}
+                  onClick={() => {
+                    closeMenu();
+                    onToggleRead();
+                  }}
+                  disabled={busy}
+                />
+                <MenuItem
+                  label="Report"
+                  icon={<ShieldAlert className="h-3.5 w-3.5" aria-hidden="true" />}
+                  onClick={() => {
+                    closeMenu();
+                    onMarkSpam();
+                  }}
+                  disabled={busy}
+                />
+              </div>
+              {moreItems}
+            </div>
+          </>
+        ) : null}
+      </div>
 
       {message.status === 'read' ? (
         <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-pastel-700">

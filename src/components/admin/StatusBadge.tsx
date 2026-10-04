@@ -1,7 +1,7 @@
-import { Eye, EyeOff, Flag, MailOpen, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, Flag, Link2, MailOpen, Sparkles } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import type { MessageStatus } from '@/types/database';
+import type { MessageStatus, MessageVisibility } from '@/types/database';
 
 const STATUS_STYLES: Record<MessageStatus, { label: string; className: string }> = {
   unread: { label: 'Unread', className: 'border-pastel-400 bg-pastel-100 text-pastel-800' },
@@ -25,8 +25,9 @@ export function StatusBadge({ status }: { status: MessageStatus }): JSX.Element 
   );
 }
 
-/** Small pill showing whether a message is published to the public page. */
-export function VisibilityBadge({ isPublic }: { isPublic: boolean }): JSX.Element {
+/** Small pill showing the thread visibility (public page vs private link). */
+export function VisibilityBadge({ visibility }: { visibility: MessageVisibility }): JSX.Element {
+  const isPublic = visibility === 'public';
   return (
     <span
       className={cn(
@@ -50,3 +51,30 @@ export function VisibilityBadge({ isPublic }: { isPublic: boolean }): JSX.Elemen
 }
 
 export const STATUS_ICONS = { MailOpen, Sparkles, Flag } as const;
+
+export type PrivateLinkState = 'active' | 'revoked' | 'none';
+
+/** Tiny always-visible private-link indicator (full management lives in the ⋯ menu). */
+export function PrivateLinkBadge({ state }: { state: PrivateLinkState }): JSX.Element {
+  const label =
+    state === 'active'
+      ? 'Private link aktif'
+      : state === 'revoked'
+        ? 'Private link dicabut'
+        : 'Belum ada private link';
+
+  return (
+    <span
+      title={label}
+      aria-label={label}
+      className={cn(
+        'inline-flex items-center rounded-full border px-2 py-0.5',
+        state === 'active' && 'border-pastel-300 bg-pastel-100 text-pastel-700',
+        state === 'revoked' && 'border-amber-200 bg-amber-50 text-amber-600',
+        state === 'none' && 'border-dashed border-pastel-200 text-ink-muted',
+      )}
+    >
+      <Link2 className="h-3 w-3" aria-hidden="true" />
+    </span>
+  );
+}

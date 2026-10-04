@@ -17,7 +17,7 @@ interface MessageListProps {
 /**
  * Public message feed.
  *
- * Only messages the owner published (`is_public = true`) ever reach this list —
+ * Only messages the owner published (`visibility = 'public'`) ever reach this list —
  * the visitor can never read the private inbox (enforced by RLS).
  */
 export function MessageList({

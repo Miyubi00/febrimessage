@@ -81,8 +81,11 @@ export function AdminDashboard(): JSX.Element {
     onChange: (payload) => {
       if (payload.eventType === 'INSERT') {
         const row = payload.new as { parent_id?: string | null } | undefined;
-        if (row?.parent_id) return; // replies are handled by the messages page
+        // Any new row (message or reply) refreshes counters + lists.
         setNewMessageToken((token) => token + 1);
+        // Only root messages pop a notification — replies are visible when the
+        // thread is opened (or after the next list refresh).
+        if (row?.parent_id) return;
         push({
           title: 'Pesan baru masuk',
           description: 'Buka tab Messages untuk membacanya.',

@@ -9,6 +9,7 @@ import { AdminMessages } from '@/pages/AdminMessages';
 import { AdminProfile } from '@/pages/AdminProfile';
 import { AdminSettings } from '@/pages/AdminSettings';
 import { NotFound } from '@/pages/NotFound';
+import { PrivateMessage } from '@/pages/PrivateMessage';
 import { PublicProfile } from '@/pages/PublicProfile';
 
 /**
@@ -28,6 +29,9 @@ export function App(): JSX.Element {
     <Routes>
       {/* Public single-profile page */}
       <Route path="/" element={<PublicProfile />} />
+
+      {/* Private thread opened with a capability link (no account needed) */}
+      <Route path="/message/:token" element={<PrivateMessage />} />
 
       {/* Admin auth (separate shell, no sidebar) */}
       <Route path="/admin/login" element={<AdminLogin />} />

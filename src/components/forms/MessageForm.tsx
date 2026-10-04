@@ -1,4 +1,4 @@
-import { ImagePlus, Mail, Send, User } from 'lucide-react';
+import { Copy, ExternalLink, ImagePlus, Mail, Send, User } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
 import { AttachmentPreviews } from '@/components/forms/AttachmentPreviews';
@@ -6,6 +6,7 @@ import { CaptchaField } from '@/components/forms/CaptchaField';
 import { Button } from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
 import { Textarea } from '@/components/ui/Textarea';
 import { useToast } from '@/components/ui/Toast';
 import { retryAfterOf, toFriendlyMessage } from '@/lib/errors';
@@ -22,7 +23,7 @@ import {
   validateMessageContent,
   validateSenderName,
 } from '@/lib/validation';
-import { submitMessage } from '@/services/messageService';
+import { submitMessage, privateThreadUrl } from '@/services/messageService';
 import type { StagedAttachment } from '@/types/message';
 import type { Profile } from '@/types/profile';
 
@@ -61,6 +62,9 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [clock, setClock] = useState(() => Date.now());
   const fileInputRef = useRef<HTMLInputElement>(null);
+  /** Raw private token from the last successful send — in-memory only (spec 45). */
+  const [sentToken, setSentToken] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const cooldownSeconds = Math.max(0, Math.ceil((cooldownUntil - clock) / 1000));
   const coolingDown = cooldownSeconds > 0;
@@ -137,6 +141,12 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
     });
   };
 
+  /** Dismiss the success popup (the token stays in memory until then). */
+  const closeSuccess = (): void => {
+    setSentToken(null);
+    setCopied(false);
+  };
+
   const resetForm = (): void => {
     setSenderName('');
     setContent('');
@@ -180,7 +190,7 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
     setSubmitting(true);
 
     try {
-      await submitMessage({
+      const result = await submitMessage({
         profileId: profile.id,
         senderName: sanitizeText(senderName),
         isAnonymous,
@@ -195,6 +205,10 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
         description: 'Terima kasih, pesanmu sudah masuk 💙',
         variant: 'success',
       });
+      // Keep the raw token ONLY in memory so the sender can open/copy their
+      // private link once (a refresh forgets it, per spec 45).
+      setSentToken(result.private_token ?? null);
+      setCopied(false);
       resetForm();
       onSent?.();
     } catch (caught) {
@@ -224,7 +238,7 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
       className={cn('surface-soft relative flex h-full flex-col p-5 sm:p-6', className)}
       noValidate
     >
-      <header className="flex items-start gap-3">
+      <header className="flex shrink-0 items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-pastel-100 text-pastel-700 sm:h-11 sm:w-11">
           <Mail className="h-5 w-5" aria-hidden="true" />
         </span>
@@ -262,7 +276,7 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
         }}
       />
 
-      <div className="mt-4 flex flex-1 flex-col justify-between gap-3">
+      <div className="scrollbar-soft mt-4 flex min-h-0 flex-1 flex-col justify-between gap-3 overflow-y-auto pr-1">
         <Input
           label="Nama anda"
           name="senderName"
@@ -322,19 +336,73 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
         <AttachmentPreviews items={attachments} onRemove={removeAttachment} />
 
         <CaptchaField onToken={handleCaptchaToken} resetKey={captchaResetKey} />
-
-        <Button
-          type="submit"
-          size="lg"
-          fullWidth
-          loading={submitting}
-          loadingText="Mengirim..."
-          disabled={coolingDown}
-          leftIcon={<Send className="h-4 w-4" aria-hidden="true" />}
-        >
-          {coolingDown ? `Coba lagi dalam ${formatRetryAfter(cooldownSeconds)}` : 'Kirim'}
-        </Button>
       </div>
+
+      <Button
+        type="submit"
+        size="lg"
+        fullWidth
+        className="mt-3 shrink-0"
+        loading={submitting}
+        loadingText="Mengirim..."
+        disabled={coolingDown}
+        leftIcon={<Send className="h-4 w-4" aria-hidden="true" />}
+      >
+        {coolingDown ? `Coba lagi dalam ${formatRetryAfter(cooldownSeconds)}` : 'Kirim'}
+      </Button>
+
+      <Modal
+        open={sentToken !== null}
+        onClose={closeSuccess}
+        title="Pesan berhasil dikirim!"
+        description="Tautan ini digunakan untuk melihat balasan jika pemilik membalas pesanmu. Simpan baik-baik dan jangan bagikan kalau pesanmu bersifat private."
+        footer={
+          <Button type="button" variant="secondary" onClick={closeSuccess}>
+            Tutup
+          </Button>
+        }
+      >
+        {sentToken ? (
+          <div>
+            <div className="flex items-center gap-2">
+              <code className="min-w-0 flex-1 truncate rounded-2xl bg-white px-3 py-2.5 font-mono text-[11px] text-ink">
+                {privateThreadUrl(sentToken)}
+              </code>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                leftIcon={<Copy className="h-3.5 w-3.5" aria-hidden="true" />}
+                onClick={() => {
+                  void navigator.clipboard
+                    .writeText(privateThreadUrl(sentToken))
+                    .then(() => {
+                      setCopied(true);
+                      push({ title: 'Link disalin', variant: 'success', duration: 2400 });
+                    })
+                    .catch(() => {
+                      push({
+                        title: 'Gagal menyalin',
+                        description: 'Salin link secara manual dari kolom di atas.',
+                        variant: 'error',
+                      });
+                    });
+                }}
+              >
+                {copied ? 'Disalin ✓' : 'Salin link'}
+              </Button>
+              <a
+                href={privateThreadUrl(sentToken)}
+                className="inline-flex h-9 items-center gap-1.5 rounded-2xl bg-pastel-400 px-3.5 text-xs font-semibold text-white shadow-soft transition hover:bg-pastel-500"
+              >
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                Lihat pesan
+              </a>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </form>
   );
 }
