@@ -1,9 +1,8 @@
 import { ImagePlus, Mail, Send, User } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { AttachmentPreviews } from '@/components/forms/AttachmentPreviews';
-import { CaptchaField } from '@/components/forms/CaptchaField';
 import { Button } from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Input } from '@/components/ui/Input';
@@ -54,8 +53,6 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [content, setContent] = useState('');
   const [honeypot, setHoneypot] = useState('');
-  const [captchaToken, setCaptchaToken] = useState('');
-  const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const [attachments, setAttachments] = useState<StagedAttachment[]>([]);
   const [senderError, setSenderError] = useState<string | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
@@ -77,8 +74,6 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
 
   const contentCount = useMemo(() => countChars(content), [content]);
   const nameCount = useMemo(() => countChars(senderName), [senderName]);
-
-  const handleCaptchaToken = useCallback((token: string) => setCaptchaToken(token), []);
 
   const handleFiles = async (files: FileList | null): Promise<void> => {
     if (!files || files.length === 0) return;
@@ -159,8 +154,6 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
     setIsAnonymous(false);
     setSenderError(null);
     setContentError(null);
-    setCaptchaToken('');
-    setCaptchaResetKey((key) => key + 1);
     setAttachments((previous) => {
       previous.forEach((item) => URL.revokeObjectURL(item.previewUrl));
       return [];
@@ -202,7 +195,6 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
         isAnonymous,
         content: sanitizeMultiline(content),
         honeypot,
-        captchaToken,
         attachmentPaths: paths,
       });
 
@@ -338,8 +330,6 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
         </div>
 
         <AttachmentPreviews items={attachments} onRemove={removeAttachment} onRetry={retryUpload} />
-
-        <CaptchaField onToken={handleCaptchaToken} resetKey={captchaResetKey} />
       </div>
 
       <Button

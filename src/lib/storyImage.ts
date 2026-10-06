@@ -43,6 +43,23 @@ const NAVY: StoryPalette = {
   shadow: 'rgba(0, 0, 0, 0.55)',
 };
 
+const PINK: StoryPalette = {
+  sky: ['#DB2777', '#F472B6', '#FBCFE8', '#FCE7F3'],
+  ink: '#831843',
+  soft: '#9D174D',
+  muted: '#BE185D',
+  pill: '#FFFFFF',
+  pillText: '#BE185D',
+  ring: '#FFFFFF',
+  shadow: 'rgba(190, 24, 93, 0.35)',
+};
+
+const PALETTES: Record<string, StoryPalette> = {
+  navy: NAVY,
+  pink: PINK,
+  'pastel-blue': LIGHT,
+};
+
 /** Deterministic pseudo-random so every render of the same profile matches. */
 export function mulberry32(seed: number): () => number {
   let state = seed >>> 0;
@@ -55,7 +72,8 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
-function loadAvatar(url: string | null): Promise<HTMLImageElement | null> {
+/** Load an image element (null when missing/unreadable) — shared by story art. */
+export function loadAvatar(url: string | null): Promise<HTMLImageElement | null> {
   if (!url) return Promise.resolve(null);
   return new Promise((resolve) => {
     const image = new Image();
@@ -198,7 +216,7 @@ export async function generateStoryImage(profile: Profile, siteOrigin: string): 
     // System fonts are a fine fallback.
   }
 
-  const palette = profile.theme === 'navy' ? NAVY : LIGHT;
+  const palette = PALETTES[profile.theme] ?? LIGHT;
   const family = '"Quicksand", "Inter", system-ui, sans-serif';
   const random = mulberry32(profile.username.length * 7919 + 13);
   const avatar = await loadAvatar(profile.avatar_url);
@@ -286,7 +304,8 @@ export async function generateStoryImage(profile: Profile, siteOrigin: string): 
   const avatarY = 500;
   const avatarR = 185;
   ctx.save();
-  ctx.fillStyle = profile.theme === 'navy' ? 'rgba(56,189,248,0.55)' : 'rgba(255,255,255,0.5)';
+  const halo = profile.theme === 'navy' ? 'rgba(56,189,248,0.55)' : profile.theme === 'pink' ? 'rgba(244,114,182,0.55)' : 'rgba(255,255,255,0.5)';
+  ctx.fillStyle = halo;
   ctx.beginPath();
   ctx.arc(cx, avatarY, avatarR + 34, 0, Math.PI * 2);
   ctx.fill();
@@ -323,7 +342,7 @@ export async function generateStoryImage(profile: Profile, siteOrigin: string): 
     ctx.fillStyle = '#A9D8FF';
     ctx.fillRect(cx - avatarR, avatarY - avatarR, avatarR * 2, avatarR * 2);
     const initial = (profile.display_name.slice(0, 1) || '?').toUpperCase();
-    ctx.fillStyle = '#1E3A5F';
+    ctx.fillStyle = palette.pillText;
     ctx.font = `700 170px ${family}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

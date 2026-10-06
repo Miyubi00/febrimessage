@@ -400,7 +400,6 @@ export function AdminMessages(): JSX.Element {
               <AdminMessageCard
                 key={item.message.id}
                 item={item}
-                ownerName={profile?.display_name ?? 'Owner'}
                 selected={detail?.message.id === item.message.id}
                 onOpenDetail={(selected) => {
                   setDetailId(selected.message.id);

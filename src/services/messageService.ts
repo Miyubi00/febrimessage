@@ -161,7 +161,6 @@ export async function submitMessage(input: SubmitMessageInput): Promise<SubmitMe
     isAnonymous: input.isAnonymous,
     content: input.content,
     honeypot: input.honeypot,
-    captchaToken: input.captchaToken ?? '',
     attachmentPaths: input.attachmentPaths,
   });
 }

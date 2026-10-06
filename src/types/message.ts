@@ -61,7 +61,6 @@ export interface SubmitMessageInput {
   isAnonymous: boolean;
   content: string;
   honeypot: string;
-  captchaToken?: string;
   attachmentPaths: string[];
 }
 
@@ -89,7 +88,7 @@ export interface DeleteMessageResult {
   removedFiles: number;
 }
 
-export type MessageFilterStatus = 'all' | 'unread' | 'read' | 'hidden';
+export type MessageFilterStatus = 'all' | 'unread' | 'read';
 export type MessageSort = 'newest' | 'oldest';
 /** Inbox visibility filter (server-side, tri-state). */
 export type MessageVisibilityFilter = 'all' | 'public' | 'private';

@@ -9,14 +9,14 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
 import { AVATAR_OUTPUT, BANNER_OUTPUT, ImageCropDialog } from '@/components/forms/ImagePicker';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Input } from '@/components/ui/Input';
-import { Modal } from '@/components/ui/Modal';
+import { ConfirmDialog, Modal } from '@/components/ui/Modal';
 import { Textarea } from '@/components/ui/Textarea';
 import { useToast } from '@/components/ui/Toast';
 import { toFriendlyMessage } from '@/lib/errors';
@@ -39,6 +39,7 @@ import {
   validateUsername,
 } from '@/lib/validation';
 import { isUsernameTaken, updateProfile } from '@/services/profileService';
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { THEME_OPTIONS, profileToDraft, type Profile, type ProfileDraft } from '@/types/profile';
 import { DiscordGlyph, RobloxGlyph } from '@/components/profile/ProfileHeader';
 import { VerifiedBadge } from '@/components/ui/Avatar';
@@ -125,6 +126,15 @@ export function ProfileEditor({ profile, adminId, onSaved }: ProfileEditorProps)
   const previewAvatar = avatar.url ?? draft.avatarUrl;
   const previewBackground = background.url ?? draft.backgroundUrl;
   const photoError = background.error ?? avatar.error;
+
+  // Unsaved edits: any draft text/photo change, or a picked photo that hasn't
+  // been uploaded yet. Saving resets the draft + upload states, clearing this.
+  const dirty = useMemo(() => {
+    if (cropTarget) return true;
+    if (avatar.path || background.path) return true;
+    return JSON.stringify(draft) !== JSON.stringify(profileToDraft(profile));
+  }, [draft, profile, avatar.path, background.path, cropTarget]);
+  const guard = useUnsavedChangesGuard(dirty && !saving);
 
   const hasDiscord = draft.discordUrl.trim() !== '';
   const hasRoblox = draft.robloxUrl.trim() !== '';
@@ -355,7 +365,11 @@ export function ProfileEditor({ profile, adminId, onSaved }: ProfileEditorProps)
   };
 
   return (
-    <form onSubmit={handleSave} className="mx-auto w-full max-w-2xl space-y-4" noValidate>
+    <form
+      onSubmit={handleSave}
+      className={`mx-auto w-full max-w-2xl space-y-4${guard.shaking ? ' animate-shake' : ''}`}
+      noValidate
+    >
       <header>
         <h1 className="font-display text-2xl font-extrabold tracking-tight text-ink">
           Profile Settings
@@ -690,6 +704,17 @@ export function ProfileEditor({ profile, adminId, onSaved }: ProfileEditorProps)
         title={cropIsAvatar ? 'Atur foto profil' : 'Atur foto banner'}
         onCancel={closeCrop}
         onConfirm={(file) => void confirmCrop(file)}
+      />
+
+      <ConfirmDialog
+        open={guard.blocked}
+        title="Perubahan belum disimpan"
+        description="Simpan dulu sebelum pindah halaman, atau buang perubahan ini?"
+        confirmLabel="Buang perubahan"
+        cancelLabel="Tetap di sini"
+        destructive
+        onConfirm={guard.discard}
+        onCancel={guard.stay}
       />
     </form>
   );

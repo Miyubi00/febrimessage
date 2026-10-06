@@ -1,4 +1,4 @@
-import { CornerDownRight, Link2Off, UserRound } from 'lucide-react';
+import { Link2Off, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { AdminMessageActions } from '@/components/admin/AdminMessageCard';
@@ -133,7 +133,7 @@ export function MessageDetailPanel({
               <p className="mt-0.5 text-[11px] text-ink-muted">{formatDateTime(message.created_at)}</p>
             </div>
             <div className="ml-auto flex flex-wrap items-center gap-1.5">
-              {message.status === 'hidden' || message.status === 'deleted' ? (
+              {message.status === 'deleted' ? (
                 <StatusBadge status={message.status} />
               ) : null}
               <VisibilityBadge visibility={message.visibility} />
@@ -154,30 +154,60 @@ export function MessageDetailPanel({
           </h3>
 
           {replies.length > 0 ? (
-            <div className="mt-3 space-y-3">
+            <ol className="relative ml-3 mt-3 space-y-3 border-l-2 border-pastel-200 py-1 pl-5">
               {replies.map(({ reply: threadReply, attachments: threadAttachments }) => {
                 const fromAdmin = threadReply.author === 'admin';
                 return (
-                  <div key={threadReply.id} className="border-l-2 border-pastel-300 pl-3">
-                    <p className="flex items-center gap-1.5 text-xs font-bold text-pastel-800">
-                      {fromAdmin ? (
-                        <CornerDownRight className="h-3.5 w-3.5" aria-hidden="true" />
-                      ) : (
-                        <UserRound className="h-3.5 w-3.5" aria-hidden="true" />
+                  <li key={threadReply.id} className="relative">
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'absolute -left-[27px] top-5 h-3 w-3 rounded-full ring-4 ring-white/80',
+                        fromAdmin ? 'bg-pastel-400' : 'bg-lavender-deep',
                       )}
-                      {fromAdmin ? ownerName : senderLabel}
-                    </p>
-                    <p className="mt-1 whitespace-pre-wrap break-words rounded-3xl bg-pastel-50/90 p-4 text-sm leading-relaxed text-ink-soft">
-                      {threadReply.content}
-                    </p>
-                    <AttachmentGrid attachments={threadAttachments} size="sm" className="mt-2" />
-                    <time dateTime={threadReply.created_at} className="mt-2 block text-[10px] text-ink-muted">
-                      {formatDateTime(threadReply.created_at)}
-                    </time>
-                  </div>
+                    />
+                    <div className="surface-soft p-4">
+                      <header className="flex items-center gap-2">
+                        {fromAdmin ? (
+                          <span
+                            aria-hidden="true"
+                            className="block h-7 w-7 shrink-0 overflow-hidden rounded-full bg-white ring-2 ring-white"
+                          >
+                            {profile?.avatar_url ? (
+                              <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              <span className="flex h-full w-full items-center justify-center text-xs font-bold text-pastel-700">
+                                {ownerName.slice(0, 1).toUpperCase()}
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          <span
+                            aria-hidden="true"
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-pastel-100 text-pastel-700"
+                          >
+                            <UserRound className="h-3.5 w-3.5" />
+                          </span>
+                        )}
+                        <p className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
+                          {fromAdmin ? ownerName : senderLabel}
+                        </p>
+                        <time
+                          dateTime={threadReply.created_at}
+                          className="shrink-0 text-[11px] font-medium tabular-nums text-ink-muted"
+                        >
+                          {formatDateTime(threadReply.created_at)}
+                        </time>
+                      </header>
+                      <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink-soft">
+                        {threadReply.content}
+                      </p>
+                      <AttachmentGrid attachments={threadAttachments} size="sm" className="mt-2" />
+                    </div>
+                  </li>
                 );
               })}
-            </div>
+            </ol>
           ) : (
             <p className="mt-2 rounded-3xl border border-dashed border-pastel-300 bg-white/70 px-4 py-3 text-sm text-ink-muted">
               Belum ada balasan untuk pesan ini.

@@ -19,7 +19,6 @@ import type { MessageWithMeta } from '@/types/message';
 
 interface AdminMessageCardProps {
   item: MessageWithMeta;
-  ownerName: string;
   selected?: boolean;
   onOpenDetail: (item: MessageWithMeta) => void;
 }
@@ -27,7 +26,6 @@ interface AdminMessageCardProps {
 /** One row of the admin inbox — tap to open the detail popup with all actions. */
 export function AdminMessageCard({
   item,
-  ownerName,
   selected = false,
   onOpenDetail,
 }: AdminMessageCardProps): JSX.Element {
@@ -98,7 +96,7 @@ export function AdminMessageCard({
         </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
-          {message.status === 'hidden' || message.status === 'deleted' ? (
+          {message.status === 'deleted' ? (
             <StatusBadge status={message.status} />
           ) : null}
           <VisibilityBadge visibility={message.visibility} />
@@ -115,15 +113,10 @@ export function AdminMessageCard({
       <AttachmentGrid attachments={attachments} size="sm" className="mt-3" />
 
       {lastReply ? (
-        <div className="mt-3 border-l-2 border-pastel-300 pl-3">
-          <p className="flex items-center gap-1.5 text-[11px] font-bold text-pastel-800">
-            <CornerDownRight className="h-3 w-3" aria-hidden="true" />
-            Reply from {lastReply.reply.author === 'admin' ? ownerName : senderLabel}
-            {replies.length > 1 ? ` • ${replies.length} balasan` : ''}
-          </p>
-          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-ink-soft">{lastReply.reply.content}</p>
-          <AttachmentGrid attachments={lastReply.attachments} size="sm" className="mt-2" />
-        </div>
+        <p className="mt-3 flex items-center gap-1.5 text-[11px] font-bold text-pastel-800">
+          <CornerDownRight className="h-3 w-3" aria-hidden="true" />
+          {replies.length} balasan
+        </p>
       ) : null}
 
       <div className="mt-3 flex items-center justify-between gap-2">

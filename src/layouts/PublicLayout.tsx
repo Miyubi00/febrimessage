@@ -45,68 +45,26 @@ const BACKDROP_THEMES: Record<string, BackdropTheme> = {
     cloud: 'bg-white/70',
     grid: 'rgba(143,203,255,0.55)',
   },
-  sky: {
+  pink: {
     page: '',
-    wash: 'bg-[radial-gradient(1000px_520px_at_8%_-8%,#E0F2FE_0%,rgba(224,242,254,0)_62%),radial-gradient(900px_460px_at_96%_4%,#BAE6FD_0%,rgba(186,230,253,0)_55%)]',
-    blobA: 'bg-sky-200/60',
-    blobB: 'bg-sky-100/80',
+    wash: 'bg-[radial-gradient(1000px_520px_at_8%_-8%,#FCE7F3_0%,rgba(252,231,243,0)_62%),radial-gradient(900px_460px_at_96%_4%,#FBCFE8_0%,rgba(251,207,232,0)_55%)]',
+    blobA: 'bg-pink-200/60',
+    blobB: 'bg-rose-100/80',
     blobC: 'bg-white/70',
     dots: [
-      'bg-sky-300/80',
-      'bg-sky-400/70',
-      'bg-cyan-300/80',
-      'bg-sky-200/90',
-      'bg-cyan-200/80',
-      'bg-sky-300/60',
+      'bg-pink-300/80',
+      'bg-rose-300/70',
+      'bg-pink-200/90',
+      'bg-rose-200/80',
+      'bg-pink-300/60',
+      'bg-rose-200/80',
     ],
-    iconA: 'text-sky-300',
-    iconB: 'text-sky-400',
-    iconC: 'text-cyan-300',
-    shape: 'text-sky-400',
+    iconA: 'text-pink-300',
+    iconB: 'text-rose-300',
+    iconC: 'text-pink-400',
+    shape: 'text-pink-300',
     cloud: 'bg-white/80',
-    grid: 'rgba(56,189,248,0.5)',
-  },
-  cloud: {
-    page: '',
-    wash: 'bg-[radial-gradient(1000px_520px_at_50%_-8%,#FFFFFF_0%,rgba(255,255,255,0)_60%),radial-gradient(800px_420px_at_90%_10%,#E2E8F0_0%,rgba(226,232,240,0)_60%)]',
-    blobA: 'bg-slate-200/60',
-    blobB: 'bg-white/80',
-    blobC: 'bg-slate-100/90',
-    dots: [
-      'bg-slate-300/80',
-      'bg-slate-200/90',
-      'bg-slate-400/60',
-      'bg-slate-300/70',
-      'bg-slate-200/80',
-      'bg-slate-300/60',
-    ],
-    iconA: 'text-slate-300',
-    iconB: 'text-slate-400',
-    iconC: 'text-slate-300',
-    shape: 'text-slate-400',
-    cloud: 'bg-white/90',
-    grid: 'rgba(148,163,184,0.5)',
-  },
-  mint: {
-    page: '',
-    wash: 'bg-[radial-gradient(1000px_520px_at_8%_-8%,#D1FAE5_0%,rgba(209,250,229,0)_62%),radial-gradient(900px_460px_at_96%_4%,#A7F3D0_0%,rgba(167,243,208,0)_55%)]',
-    blobA: 'bg-emerald-200/60',
-    blobB: 'bg-teal-100/70',
-    blobC: 'bg-emerald-50/90',
-    dots: [
-      'bg-emerald-300/80',
-      'bg-teal-400/70',
-      'bg-emerald-200/90',
-      'bg-teal-300/80',
-      'bg-emerald-400/60',
-      'bg-teal-200/80',
-    ],
-    iconA: 'text-emerald-300',
-    iconB: 'text-teal-400',
-    iconC: 'text-emerald-400',
-    shape: 'text-emerald-400',
-    cloud: 'bg-white/70',
-    grid: 'rgba(52,211,153,0.5)',
+    grid: 'rgba(244,114,182,0.5)',
   },
   navy: {
     page: 'bg-[#0A1330]',
@@ -226,7 +184,7 @@ function DotGrids({ color }: { color: string }): JSX.Element {
 }
 
 /** Festive animated sky behind the public page — colors follow the profile theme. */
-function FestiveBackdrop({ theme, butterflies }: { theme: BackdropTheme; butterflies: boolean }): JSX.Element {
+function FestiveBackdrop({ theme }: { theme: BackdropTheme }): JSX.Element {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
       <div className={cn('absolute inset-0', theme.wash)} />
@@ -255,7 +213,6 @@ function FestiveBackdrop({ theme, butterflies }: { theme: BackdropTheme; butterf
 
       <FloatingShapes shape={theme.shape} />
       <DotGrids color={theme.grid} />
-      {butterflies ? <ButterflyField /> : null}
 
       {/* Cloud bank along the bottom edge */}
       <span className={cn('absolute -bottom-10 -left-16 h-36 w-96 rounded-full blur-3xl', theme.cloud)} />
@@ -308,7 +265,9 @@ export function PublicLayout({ children, theme }: PublicLayoutProps): JSX.Elemen
         backdrop.page,
       )}
     >
-      <FestiveBackdrop theme={backdrop} butterflies={name === 'navy'} />
+      <FestiveBackdrop theme={backdrop} />
+
+      <ButterflyField theme={name} />
 
       <div className="relative mx-auto flex w-full max-w-[1200px] flex-1 flex-col px-3 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-5 lg:min-h-0 lg:pb-4">
         {children}

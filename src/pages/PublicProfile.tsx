@@ -85,9 +85,12 @@ export function PublicProfile(): JSX.Element {
             <ProfileHeader profile={profile} />
           </Card>
 
-          <Card padding="sm" className="min-h-0 flex-1">
-            <MessageForm profile={profile} onSent={refreshMessages} />
-          </Card>
+          {/* MessageForm already renders its own surface card — no extra Card. */}
+          <MessageForm
+            profile={profile}
+            onSent={refreshMessages}
+            className="min-h-0 flex-1"
+          />
         </div>
 
         <Card padding="md" className="flex min-h-0 flex-col lg:h-full">

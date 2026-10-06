@@ -7,8 +7,11 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Input } from '@/components/ui/Input';
+import { ConfirmDialog } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
+import { requestNavigation } from '@/lib/navigationGuard';
 import { toFriendlyMessage } from '@/lib/errors';
 import { validateDiscordWebhookUrl, validateEmail } from '@/lib/validation';
 import {
@@ -51,6 +54,14 @@ export function AdminSettings(): JSX.Element {
   const [emailLoading, setEmailLoading] = useState(true);
   const [emailSaving, setEmailSaving] = useState(false);
 
+  // Last-saved snapshots — the guard compares the live form against these.
+  const [savedNotif, setSavedNotif] = useState({
+    discordEnabled: false,
+    discordIncludeIp: true,
+    discordWebhookUrl: '',
+  });
+  const [savedEmail, setSavedEmail] = useState({ enabled: false, adminEmail: '' });
+
   useEffect(() => {
     let cancelled = false;
     fetchNotificationSettings()
@@ -59,6 +70,11 @@ export function AdminSettings(): JSX.Element {
         setDiscordEnabled(settings.discordEnabled);
         setDiscordIncludeIp(settings.discordIncludeIp);
         setDiscordWebhookUrl(settings.discordWebhookUrl);
+        setSavedNotif({
+          discordEnabled: settings.discordEnabled,
+          discordIncludeIp: settings.discordIncludeIp,
+          discordWebhookUrl: settings.discordWebhookUrl,
+        });
       })
       .catch(() => {
         if (!cancelled) {
@@ -123,6 +139,7 @@ export function AdminSettings(): JSX.Element {
         if (cancelled) return;
         setEmailEnabled(settings.enabled);
         setAdminEmail(settings.adminEmail);
+        setSavedEmail({ enabled: settings.enabled, adminEmail: settings.adminEmail });
       })
       .catch(() => {
         if (!cancelled) return;
@@ -149,6 +166,7 @@ export function AdminSettings(): JSX.Element {
     setEmailSaving(true);
     try {
       await saveEmailSettings({ enabled: emailEnabled, adminEmail: emailEnabled ? adminEmail : '' });
+      setSavedEmail({ enabled: emailEnabled, adminEmail: emailEnabled ? adminEmail : '' });
       push({ title: 'Pengaturan email tersimpan', variant: 'success' });
     } catch (caught) {
       push({
@@ -171,6 +189,7 @@ export function AdminSettings(): JSX.Element {
     setNotifSaving(true);
     try {
       await saveNotificationSettings({ discordEnabled, discordIncludeIp, discordWebhookUrl });
+      setSavedNotif({ discordEnabled, discordIncludeIp, discordWebhookUrl });
       push({ title: 'Pengaturan notifikasi tersimpan', variant: 'success' });
     } catch (caught) {
       push({
@@ -221,11 +240,23 @@ export function AdminSettings(): JSX.Element {
     }
   };
 
+  // Unsaved edits: typed passwords, or notification/email fields that differ
+  // from the last-saved snapshot. Saving refreshes the snapshot, clearing this.
+  const dirty =
+    password !== '' ||
+    confirm !== '' ||
+    discordEnabled !== savedNotif.discordEnabled ||
+    discordIncludeIp !== savedNotif.discordIncludeIp ||
+    discordWebhookUrl !== savedNotif.discordWebhookUrl ||
+    emailEnabled !== savedEmail.enabled ||
+    adminEmail !== savedEmail.adminEmail;
+  const guard = useUnsavedChangesGuard(dirty && !saving && !notifSaving && !emailSaving);
+
   return (
     <>
       <Seo title="Settings" description="Pengaturan akun admin." path="/admin/settings" />
 
-      <div className="space-y-4">
+      <div className={`space-y-4${guard.shaking ? ' animate-shake' : ''}`}>
         <header>
           <h1 className="font-display text-2xl font-extrabold tracking-tight text-ink">Settings</h1>
           <p className="text-sm text-ink-muted">Kelola akun admin.</p>
@@ -484,7 +515,7 @@ export function AdminSettings(): JSX.Element {
           variant="danger"
           size="lg"
           fullWidth
-          onClick={() => void handleSignOut()}
+          onClick={() => requestNavigation(() => void handleSignOut())}
           loading={signingOut}
           loadingText="Keluar…"
           leftIcon={<LogOut className="h-4 w-4" aria-hidden="true" />}
@@ -492,6 +523,17 @@ export function AdminSettings(): JSX.Element {
           Logout
         </Button>
       </div>
+
+      <ConfirmDialog
+        open={guard.blocked}
+        title="Perubahan belum disimpan"
+        description="Simpan dulu sebelum pindah halaman, atau buang perubahan ini?"
+        confirmLabel="Buang perubahan"
+        cancelLabel="Tetap di sini"
+        destructive
+        onConfirm={guard.discard}
+        onCancel={guard.stay}
+      />
     </>
   );
 }

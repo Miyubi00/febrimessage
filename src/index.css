@@ -174,6 +174,34 @@
 }
 
 /* ------------------------------------------------------------------ */
+/* Unsaved-changes shake — the form shakes when navigation is blocked   */
+/* while it still holds unsaved edits.                                  */
+/* ------------------------------------------------------------------ */
+@keyframes page-shake {
+  10%,
+  90% {
+    transform: translateX(-2px);
+  }
+  20%,
+  80% {
+    transform: translateX(3px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-5px);
+  }
+  40%,
+  60% {
+    transform: translateX(5px);
+  }
+}
+
+.animate-shake {
+  animation: page-shake 0.5s ease both;
+}
+
+/* ------------------------------------------------------------------ */
 /* Butterfly wings — scaleX flap around the body (see Butterfly.tsx).  */
 /* ------------------------------------------------------------------ */
 .bfly-wing {
@@ -365,64 +393,24 @@ html[data-theme='navy'] .hover\:border-pastel-400:hover {
 /* ------------------------------------------------------------------ */
 /* Per-theme primary accents — buttons & checkboxes follow the theme.  */
 /* ------------------------------------------------------------------ */
-html[data-theme='sky'] .bg-pastel-400 {
-  background-color: #0ea5e9;
+html[data-theme='pink'] .bg-pastel-400 {
+  background-color: #EC4899;
 }
 
-html[data-theme='sky'] .hover\:bg-pastel-500:hover {
-  background-color: #0284c7;
+html[data-theme='pink'] .hover\:bg-pastel-500:hover {
+  background-color: #DB2777;
 }
 
-html[data-theme='sky'] .active\:bg-pastel-600:active {
-  background-color: #0369a1;
+html[data-theme='pink'] .active\:bg-pastel-600:active {
+  background-color: #BE185D;
 }
 
-html[data-theme='sky'] .checked\:bg-pastel-400:checked {
-  background-color: #0ea5e9;
+html[data-theme='pink'] .checked\:bg-pastel-400:checked {
+  background-color: #EC4899;
 }
 
-html[data-theme='sky'] .checked\:border-pastel-500:checked {
-  border-color: #0ea5e9;
-}
-
-html[data-theme='mint'] .bg-pastel-400 {
-  background-color: #10b981;
-}
-
-html[data-theme='mint'] .hover\:bg-pastel-500:hover {
-  background-color: #059669;
-}
-
-html[data-theme='mint'] .active\:bg-pastel-600:active {
-  background-color: #047857;
-}
-
-html[data-theme='mint'] .checked\:bg-pastel-400:checked {
-  background-color: #10b981;
-}
-
-html[data-theme='mint'] .checked\:border-pastel-500:checked {
-  border-color: #10b981;
-}
-
-html[data-theme='cloud'] .bg-pastel-400 {
-  background-color: #64748b;
-}
-
-html[data-theme='cloud'] .hover\:bg-pastel-500:hover {
-  background-color: #475569;
-}
-
-html[data-theme='cloud'] .active\:bg-pastel-600:active {
-  background-color: #334155;
-}
-
-html[data-theme='cloud'] .checked\:bg-pastel-400:checked {
-  background-color: #64748b;
-}
-
-html[data-theme='cloud'] .checked\:border-pastel-500:checked {
-  border-color: #64748b;
+html[data-theme='pink'] .checked\:border-pastel-500:checked {
+  border-color: #EC4899;
 }
 
 html[data-theme='navy'] .bg-pastel-400 {
@@ -618,6 +606,301 @@ html[data-admin-theme='dark'] .bg-ink\/85 {
 }
 
 /* ------------------------------------------------------------------ */
+/* Theme: pink — surfaces and background tinted pink (not white).      */
+/* ------------------------------------------------------------------ */
+html[data-theme='pastel-blue'] body {
+  background-color: #EAF6FF;
+  background-image: radial-gradient(1200px 600px at 12% -10%, #C7E7FF 0%, rgba(199, 231, 255, 0) 60%),
+    radial-gradient(900px 500px at 92% 0%, #A9D8FF 0%, rgba(169, 216, 255, 0) 55%);
+}
+
+html[data-theme='pastel-blue'] .surface {
+  background-color: rgba(245, 251, 255, 0.9);
+  border-color: rgba(143, 203, 255, 0.5);
+}
+
+html[data-theme='pastel-blue'] .surface-soft {
+  background-color: rgba(232, 244, 255, 0.78);
+  border-color: rgba(143, 203, 255, 0.4);
+}
+
+html[data-theme='pastel-blue'] .surface-muted {
+  background-color: rgba(224, 239, 255, 0.85);
+  border-color: rgba(169, 216, 255, 0.45);
+}
+
+html[data-theme='pastel-blue'] .field {
+  border-color: #A9D8FF;
+}
+
+html[data-theme='pastel-blue'] .chip {
+  border-color: rgba(143, 203, 255, 0.55);
+  background-color: rgba(234, 246, 255, 0.9);
+  color: #1E40AF;
+}
+
+html[data-theme='pastel-blue'] .chip-active {
+  border-color: #5EA8FF;
+  background-color: #C7E7FF;
+  color: #1E40AF;
+}
+
+html[data-theme='pastel-blue'] .border-pastel-100,
+html[data-theme='pastel-blue'] .border-pastel-200,
+html[data-theme='pastel-blue'] .border-pastel-200\/70,
+html[data-theme='pastel-blue'] .border-pastel-200\/80,
+html[data-theme='pastel-blue'] .border-pastel-300 {
+  border-color: rgba(143, 203, 255, 0.45);
+}
+
+html[data-theme='pastel-blue'] .bg-pastel-50,
+html[data-theme='pastel-blue'] .bg-pastel-50\/90,
+html[data-theme='pastel-blue'] .bg-pastel-50\/80,
+html[data-theme='pastel-blue'] .bg-pastel-50\/70,
+html[data-theme='pastel-blue'] .bg-pastel-50\/60 {
+  background-color: rgba(219, 238, 255, 0.85);
+}
+
+html[data-theme='pastel-blue'] .bg-pastel-100,
+html[data-theme='pastel-blue'] .bg-pastel-100\/90,
+html[data-theme='pastel-blue'] .bg-pastel-100\/80,
+html[data-theme='pastel-blue'] .bg-pastel-100\/70 {
+  background-color: rgba(199, 231, 255, 0.85);
+}
+
+html[data-theme='pastel-blue'] .bg-white,
+html[data-theme='pastel-blue'] .bg-white\/90,
+html[data-theme='pastel-blue'] .bg-white\/85,
+html[data-theme='pastel-blue'] .bg-white\/80,
+html[data-theme='pastel-blue'] .bg-white\/70,
+html[data-theme='pastel-blue'] .bg-white\/60,
+html[data-theme='pastel-blue'] .bg-white\/50,
+html[data-theme='pastel-blue'] .bg-white\/95 {
+  background-color: rgba(255, 255, 255, 0.82);
+}
+
+html[data-theme='pastel-blue'] .hover\:bg-pastel-50:hover,
+html[data-theme='pastel-blue'] .hover\:bg-pastel-100\/70:hover,
+html[data-theme='pastel-blue'] .hover\:bg-pastel-100\/80:hover {
+  background-color: rgba(143, 203, 255, 0.16);
+}
+
+html[data-theme='pastel-blue'] .hover\:bg-white:hover {
+  background-color: rgba(234, 246, 255, 0.95);
+}
+
+html[data-theme='pastel-blue'] .hover\:border-pastel-300:hover,
+html[data-theme='pastel-blue'] .hover\:border-pastel-400:hover {
+  border-color: rgba(94, 168, 255, 0.6);
+}
+
+/* ------------------------------------------------------------------ */
+/* Admin light mode — blue-tinted instead of plain white-dominant.     */
+/* ------------------------------------------------------------------ */
+html[data-admin-theme='light'] body {
+  background-color: #EAF6FF;
+  background-image: radial-gradient(1200px 600px at 12% -10%, #C7E7FF 0%, rgba(199, 231, 255, 0) 60%),
+    radial-gradient(900px 500px at 92% 0%, #A9D8FF 0%, rgba(169, 216, 255, 0) 55%);
+}
+
+html[data-admin-theme='light'] .surface {
+  background-color: rgba(245, 251, 255, 0.92);
+  border-color: rgba(143, 203, 255, 0.5);
+}
+
+html[data-admin-theme='light'] .surface-soft {
+  background-color: rgba(232, 244, 255, 0.78);
+  border-color: rgba(143, 203, 255, 0.4);
+}
+
+html[data-admin-theme='light'] .surface-muted {
+  background-color: rgba(224, 239, 255, 0.85);
+  border-color: rgba(169, 216, 255, 0.45);
+}
+
+html[data-admin-theme='light'] .field {
+  border-color: #A9D8FF;
+}
+
+html[data-admin-theme='light'] .chip {
+  border-color: rgba(143, 203, 255, 0.55);
+  background-color: rgba(234, 246, 255, 0.9);
+  color: #1E40AF;
+}
+
+html[data-admin-theme='light'] .chip-active {
+  border-color: #5EA8FF;
+  background-color: #C7E7FF;
+  color: #1E40AF;
+}
+
+html[data-admin-theme='light'] .border-pastel-100,
+html[data-admin-theme='light'] .border-pastel-200,
+html[data-admin-theme='light'] .border-pastel-200\/70,
+html[data-admin-theme='light'] .border-pastel-200\/80,
+html[data-admin-theme='light'] .border-pastel-300 {
+  border-color: rgba(143, 203, 255, 0.45);
+}
+
+html[data-admin-theme='light'] .bg-pastel-50,
+html[data-admin-theme='light'] .bg-pastel-50\/90,
+html[data-admin-theme='light'] .bg-pastel-50\/80,
+html[data-admin-theme='light'] .bg-pastel-50\/70,
+html[data-admin-theme='light'] .bg-pastel-50\/60 {
+  background-color: rgba(219, 238, 255, 0.85);
+}
+
+html[data-admin-theme='light'] .bg-pastel-100,
+html[data-admin-theme='light'] .bg-pastel-100\/90,
+html[data-admin-theme='light'] .bg-pastel-100\/80,
+html[data-admin-theme='light'] .bg-pastel-100\/70 {
+  background-color: rgba(199, 231, 255, 0.85);
+}
+
+html[data-admin-theme='light'] .bg-white,
+html[data-admin-theme='light'] .bg-white\/90,
+html[data-admin-theme='light'] .bg-white\/85,
+html[data-admin-theme='light'] .bg-white\/80,
+html[data-admin-theme='light'] .bg-white\/70,
+html[data-admin-theme='light'] .bg-white\/60,
+html[data-admin-theme='light'] .bg-white\/50,
+html[data-admin-theme='light'] .bg-white\/95 {
+  background-color: rgba(255, 255, 255, 0.82);
+}
+
+html[data-admin-theme='light'] .hover\:bg-pastel-50:hover,
+html[data-admin-theme='light'] .hover\:bg-pastel-100\/70:hover,
+html[data-admin-theme='light'] .hover\:bg-pastel-100\/80:hover {
+  background-color: rgba(143, 203, 255, 0.16);
+}
+
+html[data-admin-theme='light'] .hover\:bg-white:hover {
+  background-color: rgba(234, 246, 255, 0.95);
+}
+
+html[data-admin-theme='light'] .hover\:border-pastel-300:hover,
+html[data-admin-theme='light'] .hover\:border-pastel-400:hover {
+  border-color: rgba(94, 168, 255, 0.6);
+}
+
+html[data-admin-theme='light'] ::selection {
+  background-color: rgba(169, 216, 255, 0.65);
+  color: #1E3A5F;
+}
+
+/* ------------------------------------------------------------------ */
+/* Theme: pink — surfaces and background tinted pink (not white).      */
+/* ------------------------------------------------------------------ */
+html[data-theme='pink'] body {
+  background-color: #FDF2F8;
+  background-image: radial-gradient(1200px 600px at 12% -10%, #FBCFE8 0%, rgba(251, 207, 232, 0) 60%),
+    radial-gradient(900px 500px at 92% 0%, #F9A8D4 0%, rgba(249, 168, 212, 0) 55%);
+}
+
+html[data-theme='pink'] .surface {
+  background-color: rgba(255, 250, 253, 0.88);
+  border-color: rgba(244, 114, 182, 0.45);
+}
+
+html[data-theme='pink'] .surface-soft {
+  background-color: rgba(255, 245, 250, 0.75);
+  border-color: rgba(244, 114, 182, 0.38);
+}
+
+html[data-theme='pink'] .surface-muted {
+  background-color: rgba(252, 231, 243, 0.85);
+  border-color: rgba(244, 114, 182, 0.35);
+}
+
+html[data-theme='pink'] .field {
+  border-color: #F9A8D4;
+}
+
+html[data-theme='pink'] .chip {
+  border-color: rgba(244, 114, 182, 0.45);
+  background-color: rgba(252, 231, 243, 0.85);
+  color: #9D174D;
+}
+
+html[data-theme='pink'] .chip-active {
+  border-color: #EC4899;
+  background-color: #FCE7F3;
+  color: #BE185D;
+}
+
+html[data-theme='pink'] .label-text {
+  color: #9D174D;
+}
+
+html[data-theme='pink'] .text-pastel-800 {
+  color: #BE185D;
+}
+
+html[data-theme='pink'] .text-pastel-700 {
+  color: #DB2777;
+}
+
+html[data-theme='pink'] .text-pastel-600 {
+  color: #EC4899;
+}
+
+html[data-theme='pink'] .border-pastel-100,
+html[data-theme='pink'] .border-pastel-200,
+html[data-theme='pink'] .border-pastel-200\/70,
+html[data-theme='pink'] .border-pastel-200\/80,
+html[data-theme='pink'] .border-pastel-300 {
+  border-color: rgba(244, 114, 182, 0.35);
+}
+
+html[data-theme='pink'] .bg-pastel-50,
+html[data-theme='pink'] .bg-pastel-50\/90,
+html[data-theme='pink'] .bg-pastel-50\/80,
+html[data-theme='pink'] .bg-pastel-50\/70,
+html[data-theme='pink'] .bg-pastel-50\/60,
+html[data-theme='pink'] .bg-pastel-100,
+html[data-theme='pink'] .bg-pastel-100\/90,
+html[data-theme='pink'] .bg-pastel-100\/80,
+html[data-theme='pink'] .bg-pastel-100\/70 {
+  background-color: rgba(252, 231, 243, 0.85);
+}
+
+html[data-theme='pink'] .bg-white,
+html[data-theme='pink'] .bg-white\/90,
+html[data-theme='pink'] .bg-white\/85,
+html[data-theme='pink'] .bg-white\/80,
+html[data-theme='pink'] .bg-white\/70,
+html[data-theme='pink'] .bg-white\/60,
+html[data-theme='pink'] .bg-white\/50,
+html[data-theme='pink'] .bg-white\/95 {
+  background-color: rgba(255, 255, 255, 0.82);
+}
+
+html[data-theme='pink'] .hover\:bg-pastel-50:hover,
+html[data-theme='pink'] .hover\:bg-pastel-100\/70:hover,
+html[data-theme='pink'] .hover\:bg-pastel-100\/80:hover {
+  background-color: rgba(244, 114, 182, 0.14);
+}
+
+html[data-theme='pink'] .hover\:bg-white:hover {
+  background-color: rgba(253, 242, 248, 0.95);
+}
+
+html[data-theme='pink'] .hover\:text-pastel-700:hover,
+html[data-theme='pink'] .hover\:text-pastel-800:hover {
+  color: #BE185D;
+}
+
+html[data-theme='pink'] .hover\:border-pastel-300:hover,
+html[data-theme='pink'] .hover\:border-pastel-400:hover {
+  border-color: rgba(244, 114, 182, 0.6);
+}
+
+html[data-theme='pink'] ::selection {
+  background-color: rgba(249, 168, 212, 0.65);
+  color: #831843;
+}
+
+/* ------------------------------------------------------------------ */
 /* Page background follows the active theme (kills the light flash     */
 /* behind loading skeletons on dark surfaces).                         */
 /* ------------------------------------------------------------------ */
@@ -633,4 +916,125 @@ html[data-theme='navy'] body {
   background-image: radial-gradient(1200px 600px at 12% -10%, #1e3a8a 0%, rgba(30, 58, 138, 0) 60%),
     radial-gradient(900px 500px at 92% 0%, #0ea5e9 0%, rgba(14, 165, 233, 0) 45%);
   color-scheme: dark;
+}
+
+/* ------------------------------------------------------------------ */
+/* Primary buttons in admin dark — vivid gradient so white text pops   */
+/* (mirrors the navy public theme; light mode stays pastel).           */
+/* ------------------------------------------------------------------ */
+html[data-admin-theme='dark'] .bg-pastel-400 {
+  background-color: #2563eb;
+  background-image: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%);
+}
+
+html[data-admin-theme='dark'] .hover\:bg-pastel-500:hover {
+  background-color: #1d4ed8;
+  background-image: linear-gradient(135deg, #0ea5e9 0%, #1d4ed8 100%);
+}
+
+html[data-admin-theme='dark'] .active\:bg-pastel-600:active {
+  background-color: #1e40af;
+  background-image: none;
+}
+
+html[data-admin-theme='dark'] .checked\:bg-pastel-400:checked {
+  background-color: #2563eb;
+}
+
+html[data-admin-theme='dark'] .checked\:border-pastel-500:checked {
+  border-color: #2563eb;
+}
+
+/* ------------------------------------------------------------------ */
+/* Status colors on dark surfaces — translucent tints instead of       */
+/* chalky light boxes, and text brightened for contrast. Applies to    */
+/* both admin dark and the navy public theme.                          */
+/* ------------------------------------------------------------------ */
+html[data-admin-theme='dark'] .bg-rose-50,
+html[data-admin-theme='dark'] .bg-rose-50\/80,
+html[data-theme='navy'] .bg-rose-50,
+html[data-theme='navy'] .bg-rose-50\/80 {
+  background-color: rgba(244, 63, 94, 0.12);
+}
+
+html[data-admin-theme='dark'] .bg-rose-100,
+html[data-theme='navy'] .bg-rose-100 {
+  background-color: rgba(244, 63, 94, 0.2);
+}
+
+html[data-admin-theme='dark'] .hover\:bg-rose-50:hover,
+html[data-theme='navy'] .hover\:bg-rose-50:hover {
+  background-color: rgba(244, 63, 94, 0.16);
+}
+
+html[data-admin-theme='dark'] .border-rose-200,
+html[data-theme='navy'] .border-rose-200 {
+  border-color: rgba(251, 113, 133, 0.35);
+}
+
+html[data-admin-theme='dark'] .border-rose-300,
+html[data-theme='navy'] .border-rose-300 {
+  border-color: rgba(251, 113, 133, 0.55);
+}
+
+html[data-admin-theme='dark'] .text-rose-500,
+html[data-theme='navy'] .text-rose-500 {
+  color: #fb7185;
+}
+
+html[data-admin-theme='dark'] .text-rose-400,
+html[data-theme='navy'] .text-rose-400 {
+  color: #fda4af;
+}
+
+html[data-admin-theme='dark'] .bg-amber-50,
+html[data-theme='navy'] .bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.12);
+}
+
+html[data-admin-theme='dark'] .border-amber-200,
+html[data-theme='navy'] .border-amber-200 {
+  border-color: rgba(252, 211, 77, 0.35);
+}
+
+html[data-admin-theme='dark'] .text-amber-500,
+html[data-theme='navy'] .text-amber-500 {
+  color: #fbbf24;
+}
+
+html[data-admin-theme='dark'] .text-amber-600,
+html[data-admin-theme='dark'] .text-amber-700,
+html[data-theme='navy'] .text-amber-600,
+html[data-theme='navy'] .text-amber-700 {
+  color: #fcd34d;
+}
+
+html[data-admin-theme='dark'] .bg-slate-50,
+html[data-theme='navy'] .bg-slate-50 {
+  background-color: rgba(148, 163, 184, 0.12);
+}
+
+html[data-admin-theme='dark'] .bg-slate-100,
+html[data-theme='navy'] .bg-slate-100 {
+  background-color: rgba(148, 163, 184, 0.18);
+}
+
+html[data-admin-theme='dark'] .border-slate-200,
+html[data-theme='navy'] .border-slate-200 {
+  border-color: rgba(148, 163, 184, 0.32);
+}
+
+html[data-admin-theme='dark'] .text-slate-500,
+html[data-theme='navy'] .text-slate-500 {
+  color: #94a3b8;
+}
+
+html[data-admin-theme='dark'] .bg-lavender-light,
+html[data-theme='navy'] .bg-lavender-light {
+  background-color: rgba(165, 169, 245, 0.2);
+}
+
+html[data-admin-theme='dark'] .text-lavender-deep,
+html[data-theme='navy'] .text-lavender-deep {
+  color: #c9cdff;
 }

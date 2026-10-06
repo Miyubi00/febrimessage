@@ -5,7 +5,7 @@
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
-export type MessageStatus = 'unread' | 'read' | 'hidden' | 'deleted';
+export type MessageStatus = 'unread' | 'read' | 'deleted';
 /** Who wrote a message row: the profile owner or the original sender. */
 export type MessageAuthor = 'admin' | 'sender';
 export type MessageVisibility = 'public' | 'private';

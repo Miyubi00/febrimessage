@@ -4,14 +4,13 @@
  * The ONLY way a message enters the database. The browser has no INSERT policy on
  * `public.messages`, so every submission goes through here where we apply:
  *
- *   1. CORS + method checks        4. captcha verification
- *   2. honeypot (silent drop)      5. server-side sanitising + length limits
- *   3. atomic rate limiting        6. attachment ownership/storage verification
+ *   1. CORS + method checks        4. server-side sanitising + length limits
+ *   2. honeypot (silent drop)      5. attachment ownership/storage verification
+ *   3. atomic rate limiting
  *
  * The raw IP is never stored — only a SHA-256 hash keyed by a server secret.
  */
 import { getAppSetting, resolveDiscordWebhookUrl, serviceClient } from '../_shared/clients.ts';
-import { verifyCaptcha } from '../_shared/captcha.ts';
 import { preflight } from '../_shared/cors.ts';
 import { sendDiscordNotification } from '../_shared/discord.ts';
 import { emailShell, escapeHtml, isPlausibleEmail, sendEmail } from '../_shared/email.ts';
@@ -85,8 +84,8 @@ async function resolveAttachment(
   };
 }
 
-// Limits (spec 62): 5 / 60s, 20 / hour and 50 / 24h per hashed IP.
-const SUBMIT_BURST_LIMIT = 5;
+// Limits: 10 / 60s, 20 / hour and 50 / 24h per hashed IP.
+const SUBMIT_BURST_LIMIT = 10;
 const SUBMIT_BURST_WINDOW = 60;
 const SUBMIT_HOURLY_LIMIT = 20;
 const SUBMIT_HOURLY_WINDOW = 60 * 60;
@@ -147,11 +146,6 @@ Deno.serve(async (request: Request): Promise<Response> => {
       message: 'Batas pengiriman harian tercapai. Coba lagi besok.',
     });
     if (daily) return daily;
-
-    const captcha = await verifyCaptcha(request, asString(body.captchaToken, 4096));
-    if (!captcha.ok) {
-      return apiError(request, 400, 'CAPTCHA_FAILED', 'Verifikasi captcha gagal. Coba lagi.');
-    }
 
     const profileId = asString(body.profileId, 64).trim();
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

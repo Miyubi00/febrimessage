@@ -32,7 +32,7 @@ VITE_SUPABASE_ANON_KEY=<anon-public-key>`}</code>
         </div>
 
         <p className="mt-4 text-sm leading-relaxed text-ink-soft">
-          Service-role keys, rate-limit secrets, dan captcha secret <strong>tidak boleh</strong> memakai prefix
+          Service-role keys dan rate-limit secrets <strong>tidak boleh</strong> memakai prefix
           <code className="mx-1 rounded bg-pastel-100 px-1.5 py-0.5 text-xs">VITE_</code>
           karena nilainya akan ikut ter-bundle ke browser. Nilai tersebut hanya dipakai oleh Edge Functions.
         </p>

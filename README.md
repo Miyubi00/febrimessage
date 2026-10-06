@@ -58,13 +58,9 @@ Two groups — **never** mix them up:
 | `VITE_SUPABASE_URL` | browser | project URL |
 | `VITE_SUPABASE_ANON_KEY` | browser | public anon key |
 | `VITE_SITE_NAME` | browser | branding (default `AnonMessage`) |
-| `VITE_CAPTCHA_SITE_KEY` | browser | empty = captcha disabled |
-| `VITE_CAPTCHA_PROVIDER` | browser | `hcaptcha` \| `turnstile` |
 | `SUPABASE_SERVICE_ROLE_KEY` | functions only | **bypasses RLS — never `VITE_`-prefix it** |
 | `RATE_LIMIT_SECRET` | functions only | salt for IP hashing (min 16 chars) |
 | `PRIVATE_TOKEN_SECRET` | functions only | **optional** salt for private-link hashes (falls back to `RATE_LIMIT_SECRET`) |
-| `CAPTCHA_SECRET` | functions only | provider secret; empty = skip verification |
-| `CAPTCHA_PROVIDER` | functions only | `hcaptcha` \| `turnstile` \| `disabled` |
 | `ALLOWED_ORIGINS` | functions only | comma-separated CORS origins (dev defaults built in) |
 | `DISCORD_WEBHOOK_URL` | functions only | **optional** — fallback when `app_settings.discord_webhook_url` is empty |
 
@@ -110,7 +106,6 @@ supabase/migrations/
 supabase functions deploy submit-message upload-message-attachment admin-login admin-reply \
   delete-message notify-test get-private-message private-link
 supabase secrets set SUPABASE_SERVICE_ROLE_KEY=... RATE_LIMIT_SECRET=... \
-  CAPTCHA_SECRET=... CAPTCHA_PROVIDER=hcaptcha \
   ALLOWED_ORIGINS=https://your-site.vercel.app
 # Optional — dedicated salt for private link hashes (falls back to RATE_LIMIT_SECRET):
 # supabase secrets set PRIVATE_TOKEN_SECRET=...

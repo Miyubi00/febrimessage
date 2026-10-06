@@ -25,7 +25,6 @@ const STATUS_TABS: ReadonlyArray<{ value: MessageFilterStatus; label: string }> 
   { value: 'all', label: 'All' },
   { value: 'unread', label: 'Unread' },
   { value: 'read', label: 'Read' },
-  { value: 'hidden', label: 'Hidden' },
 ];
 
 /** Search + status/sort/type filters for the admin inbox. */

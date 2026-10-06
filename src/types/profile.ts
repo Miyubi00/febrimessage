@@ -33,8 +33,6 @@ export function profileToDraft(profile: Profile): ProfileDraft {
 
 export const THEME_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
   { value: 'pastel-blue', label: 'Pastel Blue (default)' },
-  { value: 'sky', label: 'Sky' },
-  { value: 'cloud', label: 'Cloud' },
-  { value: 'mint', label: 'Mint Mist' },
   { value: 'navy', label: 'Navy Dongker' },
+  { value: 'pink', label: 'Pink' },
 ];

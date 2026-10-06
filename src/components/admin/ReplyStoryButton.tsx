@@ -13,8 +13,8 @@ interface ReplyStoryButtonProps {
 }
 
 /**
- * Message sticker: small transparent PNG card with the message in big type,
- * ready to paste over an Instagram Story background.
+ * Story artwork: full portrait 1080×1920 card with header + message,
+ * ready to post as an Instagram Story.
  */
 export function ReplyStoryButton({ message, profile }: ReplyStoryButtonProps): JSX.Element {
   const { push } = useToast();
@@ -46,7 +46,7 @@ export function ReplyStoryButton({ message, profile }: ReplyStoryButtonProps): J
     anchor.click();
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    push({ title: 'Gambar tersimpan', description: 'Tempel di atas background Story.', variant: 'success' });
+    push({ title: 'Gambar tersimpan', description: 'Siap dipasang sebagai Story.', variant: 'success' });
   };
 
   const share = async (): Promise<void> => {
@@ -69,8 +69,8 @@ export function ReplyStoryButton({ message, profile }: ReplyStoryButtonProps): J
       <button
         type="button"
         onClick={openModal}
-        aria-label="Buat stiker story"
-        title="Buat stiker story"
+        aria-label="Buat gambar story"
+        title="Buat gambar story"
         className="inline-flex items-center gap-1.5 rounded-2xl border border-pastel-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-ink-soft transition hover:border-pastel-400 hover:text-pastel-800"
       >
         <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -80,8 +80,8 @@ export function ReplyStoryButton({ message, profile }: ReplyStoryButtonProps): J
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="Stiker Pesan"
-        description="PNG transparan — tempel di atas background Story."
+        title="Story Pesan"
+        description="Portrait 1080 × 1920 dengan background — langsung pasang sebagai Story."
         size="md"
       >
         {generating ? (
@@ -101,7 +101,7 @@ export function ReplyStoryButton({ message, profile }: ReplyStoryButtonProps): J
           <>
             <img
               src={artwork.dataUrl}
-              alt="Pratinjau stiker pesan"
+              alt="Pratinjau story pesan"
               className="mx-auto max-h-[46dvh] w-auto rounded-3xl border border-pastel-200 shadow-card"
             />
             <div className="mt-3 grid grid-cols-2 gap-2">

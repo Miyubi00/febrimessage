@@ -1,6 +1,7 @@
 import { LayoutDashboard, MessageCircle, Settings2, UserCog, type LucideIcon } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 
+import { requestNavigation } from '@/lib/navigationGuard';
 import { cn } from '@/lib/utils';
 
 interface BottomNavItem {
@@ -20,6 +21,8 @@ const NAV_ITEMS: readonly BottomNavItem[] = [
 
 /** Full-width bottom navigation for the admin area (phone-style, all screens). */
 export function AdminBottomNav({ unreadCount }: { unreadCount: number }): JSX.Element {
+  const navigate = useNavigate();
+
   return (
     <nav
       aria-label="Navigasi admin"
@@ -32,6 +35,12 @@ export function AdminBottomNav({ unreadCount }: { unreadCount: number }): JSX.El
             <NavLink
               to={to}
               end={end}
+              onClick={(event) => {
+                // Let the active page stop us when it holds unsaved changes
+                // (the page shakes + asks instead of navigating away silently).
+                event.preventDefault();
+                requestNavigation(() => navigate(to));
+              }}
               className={({ isActive }) =>
                 cn(
                   'flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-semibold transition',

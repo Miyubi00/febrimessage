@@ -41,7 +41,7 @@ double_confirm_changes = true
 enable_confirmations = false
 
 # Edge Functions -------------------------------------------------------------
-# Secrets (SUPABASE_SERVICE_ROLE_KEY, RATE_LIMIT_SECRET, CAPTCHA_SECRET, ...) are
+# Secrets (SUPABASE_SERVICE_ROLE_KEY, RATE_LIMIT_SECRET, ...) are
 # provided through `supabase/.env` (never committed) when running
 # `supabase functions serve --env-file .env`.
 
