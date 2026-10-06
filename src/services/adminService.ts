@@ -75,11 +75,17 @@ export async function fetchAdminMessages(query: AdminMessageQuery): Promise<Admi
   if (query.status !== 'all') {
     builder = builder.eq('status', query.status);
   }
+  if (query.visibility !== 'all') {
+    builder = builder.eq('visibility', query.visibility);
+  }
   if (query.anonymousOnly) {
     builder = builder.eq('is_anonymous', true);
   }
   if (query.search.trim()) {
-    builder = builder.ilike('content', `%${escapeLikeTerm(query.search.trim())}%`);
+    // Search content AND sender name server-side. Commas/parens would break
+    // the `or()` parser, so they are stripped from the term.
+    const term = `%${escapeLikeTerm(query.search.trim()).replace(/[,()]/g, ' ')}%`;
+    builder = builder.or(`content.ilike.${term},sender_name.ilike.${term}`);
   }
   if (attachmentFilterIds) {
     builder = builder.in('id', attachmentFilterIds);
@@ -160,6 +166,79 @@ export async function fetchAdminMessages(query: AdminMessageQuery): Promise<Admi
   });
 
   return { items, total: count ?? items.length, page, pageSize, unreadCount };
+}
+
+/**
+ * Fetch ONE thread (root + replies + attachments + sender IP) — used to apply
+ * realtime events and moderation results without refetching the whole page.
+ * Returns null when the thread is gone (or invisible to this admin).
+ */
+export async function fetchAdminThread(
+  profileId: string,
+  rootId: string,
+): Promise<MessageWithMeta | null> {
+  const { data: root, error: rootError } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('profile_id', profileId)
+    .eq('id', rootId)
+    .is('parent_id', null)
+    .maybeSingle();
+
+  if (rootError || !root) {
+    if (rootError) logDevError('adminService.fetchAdminThread.root', rootError);
+    return null;
+  }
+
+  const [replyResult, metaResult, attachmentResult] = await Promise.all([
+    supabase
+      .from('messages')
+      .select('*')
+      .eq('parent_id', rootId)
+      .order('created_at', { ascending: true }),
+    supabase.from('message_meta').select('message_id, sender_ip').eq('message_id', rootId),
+    supabase.from('message_attachments').select('*').eq('message_id', rootId),
+  ]);
+
+  if (replyResult.error) logDevError('adminService.fetchAdminThread.replies', replyResult.error);
+  const replies = replyResult.data ?? [];
+
+  // Attachments of the replies (roots rarely have more than a handful).
+  let replyAttachments: MessageAttachmentRow[] = [];
+  if (replies.length > 0) {
+    const { data, error } = await supabase
+      .from('message_attachments')
+      .select('*')
+      .in(
+        'message_id',
+        replies.map((row) => row.id),
+      );
+    if (error) logDevError('adminService.fetchAdminThread.replyAttachments', error);
+    else replyAttachments = data ?? [];
+  }
+
+  if (metaResult.error) logDevError('adminService.fetchAdminThread.meta', metaResult.error);
+  if (attachmentResult.error) {
+    logDevError('adminService.fetchAdminThread.attachments', attachmentResult.error);
+  }
+
+  const attachmentsByMessage = groupBy<MessageAttachmentRow, string>(
+    [...(attachmentResult.data ?? []), ...replyAttachments],
+    (row) => row.message_id,
+  );
+  const metaRow = (metaResult.data ?? []).find(
+    (row) => typeof row.sender_ip === 'string' && row.sender_ip.length > 0,
+  );
+
+  return {
+    message: root,
+    attachments: attachmentsByMessage.get(root.id) ?? [],
+    replies: replies.map((reply) => ({
+      reply,
+      attachments: attachmentsByMessage.get(reply.id) ?? [],
+    })),
+    senderIp: (metaRow?.sender_ip as string | undefined) ?? null,
+  };
 }
 
 /** Number of unread root messages (drives the sidebar badge). */

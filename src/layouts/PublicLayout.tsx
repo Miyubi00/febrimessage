@@ -1,5 +1,5 @@
 import { Heart, Plus, Send, Sparkles, Star, X } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useLayoutEffect, type ReactNode } from 'react';
 
 import { ButterflyField } from '@/components/decor/ButterflyField';
 import { cn } from '@/lib/utils';
@@ -275,9 +275,30 @@ interface PublicLayoutProps {
   theme?: string;
 }
 
+const PUBLIC_THEME_KEY = 'public-theme';
+
 export function PublicLayout({ children, theme }: PublicLayoutProps): JSX.Element {
   const name = theme && BACKDROP_THEMES[theme] ? theme : 'pastel-blue';
   const backdrop = BACKDROP_THEMES[name];
+
+  // Mirror the theme onto <html> BEFORE paint (useLayoutEffect) so portaled
+  // overlays (toast, modal, lightbox) and the loading skeleton all follow the
+  // active theme. The persisted copy lets index.html apply it pre-paint on the
+  // next visit, eliminating the light-mode flash.
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-theme', name);
+    // Never let the admin theme leak onto the public page.
+    root.removeAttribute('data-admin-theme');
+    try {
+      window.localStorage.setItem(PUBLIC_THEME_KEY, name);
+    } catch {
+      // Private mode — theme just won't persist.
+    }
+    return () => {
+      root.removeAttribute('data-theme');
+    };
+  }, [name]);
 
   return (
     <div

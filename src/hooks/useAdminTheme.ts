@@ -14,7 +14,10 @@ function readStored(): AdminTheme {
 }
 
 function apply(theme: AdminTheme): void {
-  document.documentElement.setAttribute(ATTRIBUTE, theme);
+  const root = document.documentElement;
+  root.setAttribute(ATTRIBUTE, theme);
+  // Never let a persisted public theme (eg. navy) leak into the admin shell.
+  root.removeAttribute('data-theme');
 }
 
 function unapply(): void {

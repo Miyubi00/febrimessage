@@ -38,7 +38,11 @@ export function AttachmentGrid({
             <button
               key={attachment.id}
               type="button"
-              onClick={() => setOpenPath(attachment.storage_path)}
+              onClick={(event) => {
+                // Don't trigger parent cards that open the detail popup.
+                event.stopPropagation();
+                setOpenPath(attachment.storage_path);
+              }}
               className={cn(
                 'group relative overflow-hidden rounded-2xl border border-pastel-200 bg-pastel-50 shadow-soft transition hover:border-pastel-400',
                 dimensions,

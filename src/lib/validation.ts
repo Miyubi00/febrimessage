@@ -15,7 +15,7 @@ export const SENDER_NAME_MAX = 20;
 export const MESSAGE_MAX = 100;
 export const REPLY_MAX = 300;
 
-export const MAX_ATTACHMENTS = 3;
+export const MAX_ATTACHMENTS = 1;
 export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024; // 5 MB
 export const MAX_BACKGROUND_BYTES = 8 * 1024 * 1024; // 8 MB
 

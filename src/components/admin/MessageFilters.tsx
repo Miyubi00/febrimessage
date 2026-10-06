@@ -1,14 +1,16 @@
-import { ArrowDownUp, Image as ImageIcon, Search, UserRound, X } from 'lucide-react';
+import { ArrowDownUp, Eye, EyeOff, Image as ImageIcon, Search, UserRound, X } from 'lucide-react';
 
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
-import type { MessageFilterStatus, MessageSort } from '@/types/message';
+import type { MessageFilterStatus, MessageSort, MessageVisibilityFilter } from '@/types/message';
 
 interface MessageFiltersProps {
   search: string;
   onSearchChange: (value: string) => void;
   status: MessageFilterStatus;
   onStatusChange: (value: MessageFilterStatus) => void;
+  visibility: MessageVisibilityFilter;
+  onVisibilityChange: (value: MessageVisibilityFilter) => void;
   sort: MessageSort;
   onSortChange: (value: MessageSort) => void;
   anonymousOnly: boolean;
@@ -23,7 +25,6 @@ const STATUS_TABS: ReadonlyArray<{ value: MessageFilterStatus; label: string }> 
   { value: 'all', label: 'All' },
   { value: 'unread', label: 'Unread' },
   { value: 'read', label: 'Read' },
-  { value: 'spam', label: 'Spam' },
   { value: 'hidden', label: 'Hidden' },
 ];
 
@@ -33,6 +34,8 @@ export function MessageFilters({
   onSearchChange,
   status,
   onStatusChange,
+  visibility,
+  onVisibilityChange,
   sort,
   onSortChange,
   anonymousOnly,
@@ -101,6 +104,28 @@ export function MessageFilters({
             {tab.label}
           </button>
         ))}
+
+        <span className="mx-1 hidden h-5 w-px bg-pastel-200 sm:block" aria-hidden="true" />
+
+        <button
+          type="button"
+          onClick={() => onVisibilityChange(visibility === 'public' ? 'all' : 'public')}
+          aria-pressed={visibility === 'public'}
+          className={cn('chip', visibility === 'public' && 'chip-active')}
+        >
+          <Eye className="h-3 w-3" aria-hidden="true" />
+          Public
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onVisibilityChange(visibility === 'private' ? 'all' : 'private')}
+          aria-pressed={visibility === 'private'}
+          className={cn('chip', visibility === 'private' && 'chip-active')}
+        >
+          <EyeOff className="h-3 w-3" aria-hidden="true" />
+          Private
+        </button>
 
         <span className="mx-1 hidden h-5 w-px bg-pastel-200 sm:block" aria-hidden="true" />
 

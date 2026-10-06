@@ -542,17 +542,16 @@ export function ProfileEditor({ profile, adminId, onSaved }: ProfileEditorProps)
         />
       </Card>
 
-      <div className="flex justify-end">
-        <Button
-          type="submit"
-          size="lg"
-          loading={saving}
-          loadingText="Menyimpan…"
-          leftIcon={<Save className="h-4 w-4" aria-hidden="true" />}
-        >
-          Simpan
-        </Button>
-      </div>
+      <Button
+        type="submit"
+        size="lg"
+        fullWidth
+        loading={saving}
+        loadingText="Menyimpan…"
+        leftIcon={<Save className="h-4 w-4" aria-hidden="true" />}
+      >
+        Simpan Perubahan
+      </Button>
 
       <Modal
         open={modalOpen}

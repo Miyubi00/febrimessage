@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info, TriangleAlert, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
-export type ToastVariant = 'success' | 'error' | 'info';
+export type ToastVariant = 'success' | 'error' | 'info' | 'warning';
 
 export interface Toast {
   id: string;
@@ -34,6 +34,10 @@ const VARIANT_STYLES: Record<ToastVariant, { container: string; icon: ReactNode 
   info: {
     container: 'border-lavender bg-white/95 text-ink',
     icon: <Info className="h-5 w-5 shrink-0 text-lavender-deep" aria-hidden="true" />,
+  },
+  warning: {
+    container: 'border-amber-200 bg-white/95 text-ink',
+    icon: <TriangleAlert className="h-5 w-5 shrink-0 text-amber-500" aria-hidden="true" />,
   },
 };
 

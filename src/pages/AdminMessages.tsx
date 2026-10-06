@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, Inbox, RefreshCw } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 import { AdminMessageCard } from '@/components/admin/AdminMessageCard';
 import { MessageDetailPanel } from '@/components/admin/MessageDetailPanel';
@@ -15,27 +16,55 @@ import { useAdminOutlet } from '@/pages/AdminDashboard';
 import {
   deleteMessage,
   fetchAdminMessages,
+  fetchAdminThread,
   setThreadVisibility,
   updateMessageStatus,
 } from '@/services/adminService';
-import type { MessageRow, MessageStatus, MessageVisibility } from '@/types/database';
+import type { MessageRow, MessageVisibility } from '@/types/database';
 import type {
   AdminMessageQuery,
   MessageFilterStatus,
   MessageSort,
+  MessageVisibilityFilter,
   MessageWithMeta,
 } from '@/types/message';
 
 const PAGE_SIZE = 20;
 
+interface LiveFilters {
+  search: string;
+  status: MessageFilterStatus;
+  visibility: MessageVisibilityFilter;
+  anonymousOnly: boolean;
+  withImageOnly: boolean;
+  sort: MessageSort;
+  page: number;
+}
+
+/** Client-side mirror of the server query so realtime events can be merged. */
+function threadMatchesFilters(item: MessageWithMeta, filters: LiveFilters): boolean {
+  const { message, attachments } = item;
+  if (filters.status !== 'all' && message.status !== filters.status) return false;
+  if (filters.visibility !== 'all' && message.visibility !== filters.visibility) return false;
+  if (filters.anonymousOnly && !message.is_anonymous) return false;
+  if (filters.withImageOnly && attachments.length === 0) return false;
+  const term = filters.search.trim().toLowerCase();
+  if (term) {
+    const haystack = `${message.content} ${message.sender_name ?? ''}`.toLowerCase();
+    if (!haystack.includes(term)) return false;
+  }
+  return true;
+}
+
 /** Admin inbox: search, filter, sort, paginate and moderate messages. */
 export function AdminMessages(): JSX.Element {
-  const { profile, newMessageToken, loadingProfile } = useAdminOutlet();
+  const { profile, loadingProfile, liveEvent, refreshUnread } = useAdminOutlet();
   const { push } = useToast();
 
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<MessageFilterStatus>('all');
+  const [visibility, setVisibility] = useState<MessageVisibilityFilter>('all');
   const [sort, setSort] = useState<MessageSort>('newest');
   const [anonymousOnly, setAnonymousOnly] = useState(false);
   const [withImageOnly, setWithImageOnly] = useState(false);
@@ -48,9 +77,13 @@ export function AdminMessages(): JSX.Element {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
-  const [detail, setDetail] = useState<MessageWithMeta | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<MessageWithMeta | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  /** Synchronous mirror of `items` for realtime presence checks. */
+  const itemsRef = useRef<MessageWithMeta[]>([]);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);  const [deleting, setDeleting] = useState(false);
   /** Visibility change awaiting confirmation (spec 52). */
   const [pendingVisibility, setPendingVisibility] = useState<{
     item: MessageWithMeta;
@@ -68,7 +101,7 @@ export function AdminMessages(): JSX.Element {
 
   useEffect(() => {
     setPage(1);
-  }, [status, sort, anonymousOnly, withImageOnly]);
+  }, [status, visibility, sort, anonymousOnly, withImageOnly]);
 
   const query = useMemo<AdminMessageQuery | null>(() => {
     if (!profile) return null;
@@ -76,13 +109,14 @@ export function AdminMessages(): JSX.Element {
       profileId: profile.id,
       search,
       status,
+      visibility,
       anonymousOnly,
       withImageOnly,
       sort,
       page,
       pageSize: PAGE_SIZE,
     };
-  }, [profile, search, status, anonymousOnly, withImageOnly, sort, page]);
+  }, [profile, search, status, visibility, anonymousOnly, withImageOnly, sort, page]);
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
 
@@ -114,21 +148,127 @@ export function AdminMessages(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [query, reloadToken, newMessageToken]);
+  }, [query, reloadToken]);
+
+  const detail = useMemo(
+    () => items.find((item) => item.message.id === detailId) ?? null,
+    [items, detailId],
+  );
+
+  // -- Targeted realtime patches (no full-page refetch) --------------------
+  const applyLiveEvent = useCallback(
+    async (payload: RealtimePostgresChangesPayload<MessageRow>): Promise<void> => {
+      if (!profile) return;
+      const filters: LiveFilters = { search, status, visibility, anonymousOnly, withImageOnly, sort, page };
+
+      if (payload.eventType === 'INSERT') {
+        const row = payload.new;
+        if (!row || row.profile_id !== profile.id) return;
+
+        if (!row.parent_id) {
+          // New root thread: fetch it once, then prepend only when it belongs
+          // on this exact page (newest-first, first page, matching filters).
+          const thread = await fetchAdminThread(profile.id, row.id).catch(() => null);
+          if (!thread) return;
+          if (!threadMatchesFilters(thread, filters)) return;
+          if (itemsRef.current.some((item) => item.message.id === thread.message.id)) return;
+          setTotal((value) => value + 1);
+          if (filters.sort === 'newest' && filters.page === 1) {
+            setItems((current) => [thread, ...current].slice(0, PAGE_SIZE));
+          }
+          return;
+        }
+
+        // New reply: refresh its parent thread in place.
+        const thread = await fetchAdminThread(profile.id, row.parent_id).catch(() => null);
+        if (!thread) return;
+        setItems((current) =>
+          current.map((item) => (item.message.id === thread.message.id ? thread : item)),
+        );
+        return;
+      }
+
+      if (payload.eventType === 'UPDATE') {
+        const row = payload.new;
+        if (!row || row.profile_id !== profile.id) return;
+        const rootId = row.parent_id ?? row.id;
+        const thread = await fetchAdminThread(profile.id, rootId).catch(() => null);
+        const present = itemsRef.current.some((item) => item.message.id === rootId);
+        if (thread && threadMatchesFilters(thread, filters)) {
+          if (present) {
+            setItems((current) =>
+              current.map((item) => (item.message.id === rootId ? thread : item)),
+            );
+          } else {
+            // It just became visible under the active filter (eg. marked read
+            // while filtering "read").
+            setTotal((value) => value + 1);
+            if (filters.sort === 'newest' && filters.page === 1) {
+              setItems((current) => [thread, ...current].slice(0, PAGE_SIZE));
+            }
+          }
+          return;
+        }
+        if (present) {
+          // It just left the active filter (or was hidden/deleted).
+          setTotal((value) => Math.max(0, value - 1));
+          if (detailId === rootId) setDetailId(null);
+          setItems((current) => current.filter((item) => item.message.id !== rootId));
+        }
+        return;
+      }
+
+      if (payload.eventType === 'DELETE') {
+        const old = payload.old as Partial<MessageRow> | undefined;
+        const deletedId = old?.id;
+        if (!deletedId) return;
+        if (!old?.parent_id) {
+          if (!itemsRef.current.some((item) => item.message.id === deletedId)) return;
+          setTotal((value) => Math.max(0, value - 1));
+          if (detailId === deletedId) setDetailId(null);
+          setItems((current) => current.filter((item) => item.message.id !== deletedId));
+          return;
+        }
+        // A reply was deleted: refresh the parent thread in place.
+        const thread = await fetchAdminThread(profile.id, old.parent_id).catch(() => null);
+        if (!thread) return;
+        setItems((current) =>
+          current.map((item) => (item.message.id === thread.message.id ? thread : item)),
+        );
+      }
+    },
+    [profile, search, status, visibility, anonymousOnly, withImageOnly, sort, page, detailId],
+  );
+
+  const lastLiveSeq = useMemo(() => liveEvent?.seq ?? 0, [liveEvent]);
+  useEffect(() => {
+    if (!liveEvent || liveEvent.seq === 0) return;
+    void applyLiveEvent(liveEvent.payload);
+  }, [lastLiveSeq]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  /** Patch one thread in the list (and the open detail) without refetching. */
+  const patchItem = useCallback((id: string, patch: (item: MessageWithMeta) => MessageWithMeta) => {
+    setItems((current) => current.map((item) => (item.message.id === id ? patch(item) : item)));
+  }, []);
 
   const runAction = async (
     item: MessageWithMeta,
     action: () => Promise<void>,
     successTitle: string,
+    apply: (item: MessageWithMeta) => MessageWithMeta,
   ): Promise<void> => {
-    setBusyId(item.message.id);
+    const id = item.message.id;
+    const before = item;
+    patchItem(id, apply);
+    setBusyId(id);
     try {
       await action();
       push({ title: successTitle, variant: 'success', duration: 2600 });
-      reload();
+      refreshUnread();
     } catch (caught) {
+      patchItem(id, () => before);
       push({
         title: 'Aksi gagal',
         description: toFriendlyMessage(caught, 'Coba lagi sebentar lagi.'),
@@ -137,24 +277,6 @@ export function AdminMessages(): JSX.Element {
     } finally {
       setBusyId(null);
     }
-  };
-
-  const handleToggleRead = (item: MessageWithMeta): void => {
-    const next: MessageStatus = item.message.status === 'unread' ? 'read' : 'unread';
-    void runAction(
-      item,
-      () => updateMessageStatus(item.message.id, next),
-      next === 'read' ? 'Ditandai sudah dibaca' : 'Ditandai belum dibaca',
-    );
-  };
-
-  const handleMarkSpam = (item: MessageWithMeta): void => {
-    const next: MessageStatus = item.message.status === 'spam' ? 'read' : 'spam';
-    void runAction(
-      item,
-      () => updateMessageStatus(item.message.id, next),
-      next === 'spam' ? 'Ditandai sebagai spam' : 'Spam dibatalkan',
-    );
   };
 
   const handleTogglePublic = (item: MessageWithMeta): void => {
@@ -171,24 +293,38 @@ export function AdminMessages(): JSX.Element {
       item,
       () => setThreadVisibility(item.message.id, next),
       next === 'public' ? 'Thread dipublikasikan' : 'Thread dijadikan private',
+      (current) => ({
+        ...current,
+        message: { ...current.message, visibility: next, is_public: next === 'public' },
+      }),
     );
   };
 
-  const handleReplied = (_item: MessageWithMeta, _reply: MessageRow): void => {
+  const handleReplied = (item: MessageWithMeta, reply: MessageRow): void => {
+    // The server row goes straight into the thread — no refetch, no reload.
+    patchItem(item.message.id, (current) => ({
+      ...current,
+      message: { ...current.message, visibility: reply.visibility ?? current.message.visibility },
+      replies: [...current.replies, { reply, attachments: [] }],
+    }));
     push({ title: 'Balasan terkirim', variant: 'success', duration: 2400 });
-    reload();
   };
 
   const confirmDelete = async (): Promise<void> => {
-    if (!pendingDelete) return;
+    if (!pendingDeleteId) return;
+    const id = pendingDeleteId;
     setDeleting(true);
     try {
-      await deleteMessage(pendingDelete.message.id);
+      await deleteMessage(id);
       push({ title: 'Pesan dihapus', description: 'Lampiran ikut dibersihkan.', variant: 'success' });
-      setPendingDelete(null);
-      setDetail(null);
-      reload();
+      setPendingDeleteId(null);
+      if (detailId === id) setDetailId(null);
+      if (itemsRef.current.some((item) => item.message.id === id)) {
+        setTotal((value) => Math.max(0, value - 1));
+        setItems((current) => current.filter((item) => item.message.id !== id));
+      }
     } catch (caught) {
+      // The row stays exactly where it was — a failed delete never hides data.
       push({
         title: 'Gagal menghapus pesan',
         description: toFriendlyMessage(caught, 'Coba lagi sebentar lagi.'),
@@ -235,6 +371,8 @@ export function AdminMessages(): JSX.Element {
           onSearchChange={setSearchInput}
           status={status}
           onStatusChange={setStatus}
+          visibility={visibility}
+          onVisibilityChange={setVisibility}
           sort={sort}
           onSortChange={setSort}
           anonymousOnly={anonymousOnly}
@@ -263,20 +401,19 @@ export function AdminMessages(): JSX.Element {
                 key={item.message.id}
                 item={item}
                 ownerName={profile?.display_name ?? 'Owner'}
-                profile={profile}
                 selected={detail?.message.id === item.message.id}
-                busy={busyId === item.message.id}
                 onOpenDetail={(selected) => {
-                  setDetail(selected);
+                  setDetailId(selected.message.id);
                   if (selected.message.status === 'unread') {
-                    void updateMessageStatus(selected.message.id, 'read').then(reload).catch(() => undefined);
+                    patchItem(selected.message.id, (current) => ({
+                      ...current,
+                      message: { ...current.message, status: 'read' },
+                    }));
+                    void updateMessageStatus(selected.message.id, 'read')
+                      .then(() => refreshUnread())
+                      .catch(() => undefined);
                   }
                 }}
-                onDelete={setPendingDelete}
-                onToggleRead={handleToggleRead}
-                onMarkSpam={handleMarkSpam}
-                onTogglePublic={handleTogglePublic}
-                onReplied={handleReplied}
               />
             ))}
           </div>
@@ -315,22 +452,20 @@ export function AdminMessages(): JSX.Element {
         ownerName={profile?.display_name ?? 'Owner'}
         profile={profile}
         busy={detail ? busyId === detail.message.id : false}
-        onClose={() => setDetail(null)}
-        onDelete={setPendingDelete}
-        onToggleRead={handleToggleRead}
-        onMarkSpam={handleMarkSpam}
+        onClose={() => setDetailId(null)}
+        onDelete={(target) => setPendingDeleteId(target.message.id)}
         onTogglePublic={handleTogglePublic}
         onReplied={handleReplied}
       />
 
       <ConfirmDialog
-        open={Boolean(pendingDelete)}
+        open={Boolean(pendingDeleteId)}
         title="Yakin ingin menghapus pesan ini?"
         description="Pesan, balasan, dan lampirannya akan dihapus permanen dari database dan storage."
         confirmLabel="Hapus pesan"
         loading={deleting}
         onConfirm={() => void confirmDelete()}
-        onCancel={() => setPendingDelete(null)}
+        onCancel={() => setPendingDeleteId(null)}
       />
 
       <ConfirmDialog

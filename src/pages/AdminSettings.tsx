@@ -467,8 +467,13 @@ export function AdminSettings(): JSX.Element {
               </p>
             ) : null}
 
-            <div className="sm:col-span-2 flex justify-end">
-              <Button type="submit" loading={saving} loadingText="Menyimpan…">
+            <div className="sm:col-span-2 flex justify-start">
+              <Button
+                type="submit"
+                loading={saving}
+                loadingText="Menyimpan…"
+                className="w-full sm:w-auto"
+              >
                 Perbarui password
               </Button>
             </div>

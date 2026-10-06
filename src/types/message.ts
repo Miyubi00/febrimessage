@@ -89,13 +89,16 @@ export interface DeleteMessageResult {
   removedFiles: number;
 }
 
-export type MessageFilterStatus = 'all' | 'unread' | 'read' | 'spam' | 'hidden';
+export type MessageFilterStatus = 'all' | 'unread' | 'read' | 'hidden';
 export type MessageSort = 'newest' | 'oldest';
+/** Inbox visibility filter (server-side, tri-state). */
+export type MessageVisibilityFilter = 'all' | 'public' | 'private';
 
 export interface AdminMessageQuery {
   profileId: string;
   search: string;
   status: MessageFilterStatus;
+  visibility: MessageVisibilityFilter;
   anonymousOnly: boolean;
   withImageOnly: boolean;
   sort: MessageSort;

@@ -1,4 +1,4 @@
-import { AlertTriangle, Send } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/Button';
@@ -66,64 +66,38 @@ export function ReplyForm({
 
   return (
     <div className={className}>
-      <fieldset className="mb-3 rounded-3xl border border-pastel-200 bg-white/70 p-3">
-        <legend className="px-2 text-xs font-bold text-ink-soft">Reply visibility</legend>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label
-            className={`flex cursor-pointer items-start gap-2.5 rounded-2xl border p-3 transition ${
-              visibility === 'public'
-                ? 'border-pastel-400 bg-pastel-50 shadow-soft'
-                : 'border-pastel-100 hover:border-pastel-300'
-            }`}
-          >
-            <input
-              type="radio"
-              name={`reply-visibility-${messageId}`}
-              value="public"
-              checked={visibility === 'public'}
-              onChange={() => setVisibility('public')}
-              className="mt-0.5 h-4 w-4 shrink-0 accent-pastel-500"
-            />
-            <span>
-              <span className="block text-xs font-bold text-ink">Public</span>
-              <span className="mt-0.5 block text-[11px] leading-relaxed text-ink-muted">
-                Pesan + balasan dapat dilihat semua orang.
-              </span>
-            </span>
-          </label>
-          <label
-            className={`flex cursor-pointer items-start gap-2.5 rounded-2xl border p-3 transition ${
-              visibility === 'private'
-                ? 'border-pastel-400 bg-pastel-50 shadow-soft'
-                : 'border-pastel-100 hover:border-pastel-300'
-            }`}
-          >
-            <input
-              type="radio"
-              name={`reply-visibility-${messageId}`}
-              value="private"
-              checked={visibility === 'private'}
-              onChange={() => setVisibility('private')}
-              className="mt-0.5 h-4 w-4 shrink-0 accent-pastel-500"
-            />
-            <span>
-              <span className="block text-xs font-bold text-ink">Private — hanya pengirim</span>
-              <span className="mt-0.5 block text-[11px] leading-relaxed text-ink-muted">
-                Hanya pembuka link private yang bisa melihat.
-              </span>
-            </span>
-          </label>
-        </div>
-        {visibility === 'private' ? (
-          <p className="mt-2 flex items-start gap-1.5 rounded-2xl bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-700">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            Pesan asli akan otomatis menjadi private dan tidak akan muncul di halaman publik.
-          </p>
-        ) : null}
-      </fieldset>
+      <div role="radiogroup" aria-label="Reply visibility" className="mb-3 grid grid-cols-2 gap-2">
+        {(
+          [
+            { value: 'public', label: 'Public' },
+            { value: 'private', label: 'Private' },
+          ] as const
+        ).map((option) => {
+          const active = visibility === option.value;
+          return (
+            <label
+              key={option.value}
+              className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl border px-3 py-2.5 text-xs font-bold transition ${
+                active
+                  ? 'border-pastel-400 bg-pastel-50 text-ink shadow-soft'
+                  : 'border-pastel-100 text-ink-muted hover:border-pastel-300'
+              }`}
+            >
+              <input
+                type="radio"
+                name={`reply-visibility-${messageId}`}
+                value={option.value}
+                checked={active}
+                onChange={() => setVisibility(option.value)}
+                className="h-4 w-4 shrink-0 accent-pastel-500"
+              />
+              {option.label}
+            </label>
+          );
+        })}
+      </div>
 
       <Textarea
-        label="Tulis balasan..."
         name={`reply-${messageId}`}
         placeholder="Tulis balasan..."
         maxLength={REPLY_MAX}

@@ -1,6 +1,7 @@
 import { AlertTriangle, BellRing, Lock, Send, UserRound } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import type { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 import { Seo } from '@/components/Seo';
 import { Avatar } from '@/components/ui/Avatar';
@@ -12,7 +13,8 @@ import { MessageSkeleton } from '@/components/ui/Skeleton';
 import { Modal } from '@/components/ui/Modal';
 import { Textarea } from '@/components/ui/Textarea';
 import { useToast } from '@/components/ui/Toast';
-import { toFriendlyMessage } from '@/lib/errors';
+import { logDevError, toFriendlyMessage } from '@/lib/errors';
+import { supabase } from '@/lib/supabase';
 import { formatDateTime } from '@/lib/utils';
 import { REPLY_MAX, countChars, validateEmail, validateMessageContent } from '@/lib/validation';
 import { PublicLayout } from '@/layouts/PublicLayout';
@@ -22,13 +24,19 @@ import {
   sendSenderReply,
   subscribeThread,
 } from '@/services/messageService';
-import type { PrivateAttachmentView, PrivateThread } from '@/types/message';
+import type { PrivateAttachmentView, PrivateThread, PrivateThreadReply } from '@/types/message';
+import type { MessageRow } from '@/types/database';
+
+function replyKey(reply: { content: string; createdAt: string; author: string }): string {
+  return `${reply.author}|${reply.createdAt}|${reply.content}`;
+}
 
 function usePrivateThreadState(token: string | undefined) {
   const [thread, setThread] = useState<PrivateThread | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const lastLoadedAt = useRef(0);
 
   useEffect(() => {
     if (!token) {
@@ -43,7 +51,9 @@ function usePrivateThreadState(token: string | undefined) {
 
     fetchPrivateThread(token)
       .then((result) => {
-        if (!cancelled) setThread(result);
+        if (cancelled) return;
+        setThread(result);
+        lastLoadedAt.current = Date.now();
       })
       .catch((caught) => {
         if (!cancelled) setError(toFriendlyMessage(caught, 'Pesan tidak ditemukan atau link sudah tidak valid.'));
@@ -57,7 +67,149 @@ function usePrivateThreadState(token: string | undefined) {
     };
   }, [token, reloadToken]);
 
-  return { thread, loading, error, reload: () => setReloadToken((value) => value + 1) };
+  /** Merge fresh data without flashing the full-page skeleton. */
+  const refreshSilently = useCallback(async (): Promise<void> => {
+    if (!token) return;
+    try {
+      const result = await fetchPrivateThread(token);
+      setThread(result);
+      setError(null);
+      lastLoadedAt.current = Date.now();
+    } catch {
+      // Keep showing the current thread — a background refresh never blanks it.
+    }
+  }, [token]);
+
+  /** Apply one realtime row event to the visible thread (dedupe by identity). */
+  const applyPatch = useCallback((reply: PrivateThreadReply): void => {
+    setThread((current) => {
+      if (!current) return current;
+      const key = replyKey(reply);
+      if (current.replies.some((existing) => replyKey(existing) === key)) return current;
+      return { ...current, replies: [...current.replies, reply] };
+    });
+  }, []);
+
+  const refreshIfStale = useCallback((): void => {
+    if (Date.now() - lastLoadedAt.current > 15_000) void refreshSilently();
+  }, [refreshSilently]);
+
+  return {
+    thread,
+    loading,
+    error,
+    reload: () => setReloadToken((value) => value + 1),
+    refreshSilently,
+    applyPatch,
+    refreshIfStale,
+  };
+}
+
+/**
+ * Live updates for one private thread (INSERT/UPDATE/DELETE on `messages`).
+ *
+ * Rows outside the visitor's RLS reach (private threads for anonymous
+ * visitors) simply produce no events — the page additionally refreshes
+ * silently when it regains focus, so nothing ever goes stale.
+ */
+function usePrivateThreadRealtime(
+  threadId: string | null,
+  enabled: boolean,
+  onInsertReply: (row: MessageRow) => void,
+  onChanged: () => void,
+): { connected: boolean } {
+  const [connected, setConnected] = useState(false);
+  const insertRef = useRef(onInsertReply);
+  insertRef.current = onInsertReply;
+  const changedRef = useRef(onChanged);
+  changedRef.current = onChanged;
+
+  useEffect(() => {
+    if (!enabled || !threadId) {
+      setConnected(false);
+      return;
+    }
+
+    let channel: RealtimeChannel | null = null;
+    let cancelled = false;
+    let retryTimer: number | null = null;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 5;
+
+    const scheduleRetry = (): void => {
+      if (cancelled || attempts >= MAX_ATTEMPTS) return;
+      const delay = Math.min(1000 * 2 ** attempts, 16000);
+      attempts += 1;
+      retryTimer = window.setTimeout(() => {
+        retryTimer = null;
+        if (!cancelled) void subscribe();
+      }, delay);
+    };
+
+    const handleRow = (
+      payload: RealtimePostgresChangesPayload<MessageRow>,
+    ): void => {
+      if (payload.eventType === 'INSERT') {
+        const row = payload.new;
+        if (row && (row.parent_id === threadId || row.id === threadId)) {
+          if (row.parent_id === threadId) insertRef.current(row);
+          else changedRef.current();
+        }
+        return;
+      }
+      // UPDATE/DELETE: merge silently (dedupe + ordering stay server-driven).
+      changedRef.current();
+    };
+
+    const subscribe = async (): Promise<void> => {
+      if (cancelled) return;
+      if (channel) {
+        const stale = channel;
+        channel = null;
+        void supabase.removeChannel(stale).catch(() => undefined);
+      }
+
+      channel = supabase
+        .channel(`private-thread:${threadId}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `parent_id=eq.${threadId}`,
+        }, handleRow)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'messages',
+          filter: `id=eq.${threadId}`,
+        }, handleRow);
+
+      channel.subscribe((status) => {
+        if (cancelled) return;
+        if (status === 'SUBSCRIBED') {
+          attempts = 0;
+          setConnected(true);
+          return;
+        }
+        setConnected(false);
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          logDevError('usePrivateThreadRealtime', `channel status: ${status}`);
+          scheduleRetry();
+        }
+      });
+    };
+
+    void subscribe();
+
+    return () => {
+      cancelled = true;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      setConnected(false);
+      if (channel) void supabase.removeChannel(channel);
+    };
+  }, [threadId, enabled]);
+
+  return { connected };
 }
 
 function PrivateAttachments({ items }: { items: PrivateAttachmentView[] }): JSX.Element | null {
@@ -141,7 +293,8 @@ function ThreadItem({
 export function PrivateMessage(): JSX.Element {
   const { token } = useParams<{ token: string }>();
   const { push } = useToast();
-  const { thread, loading, error, reload } = usePrivateThreadState(token);
+  const { thread, loading, error, refreshSilently, applyPatch, refreshIfStale } =
+    usePrivateThreadState(token);
 
   const [answer, setAnswer] = useState('');
   const [answerError, setAnswerError] = useState<string | null>(null);
@@ -151,6 +304,41 @@ export function PrivateMessage(): JSX.Element {
   const [notifyEmail, setNotifyEmail] = useState('');
   const [notifyError, setNotifyError] = useState<string | null>(null);
   const [notifySaving, setNotifySaving] = useState(false);
+
+  // Live thread updates: admin replies arrive without any refresh. RLS decides
+  // which rows this visitor may receive — public threads stream fully, private
+  // threads fall back to the silent focus refresh below.
+  const handleRealtimeReply = useCallback(
+    (row: MessageRow) => {
+      applyPatch({
+        content: row.content,
+        createdAt: row.created_at,
+        author: row.author === 'admin' ? 'admin' : 'sender',
+        attachments: [],
+      });
+    },
+    [applyPatch],
+  );
+  usePrivateThreadRealtime(
+    thread?.id ?? null,
+    !loading && !error && Boolean(thread),
+    handleRealtimeReply,
+    refreshSilently,
+  );
+
+  // Private threads cannot stream to anonymous visitors (RLS), so refresh
+  // silently when the tab regains focus instead of asking for a manual reload.
+  useEffect(() => {
+    const onVisible = (): void => {
+      if (document.visibilityState === 'visible') refreshIfStale();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [refreshIfStale]);
 
   const handleCopy = (): void => {
     if (!token) return;
@@ -170,11 +358,12 @@ export function PrivateMessage(): JSX.Element {
 
     setSending(true);
     try {
-      await sendSenderReply(token, answer);
+      const reply = await sendSenderReply(token, answer);
+      // The server row goes straight into the timeline — no refetch, no reload.
+      applyPatch({ content: reply.content, createdAt: reply.created_at, author: 'sender', attachments: [] });
       setAnswer('');
       setAnswerError(null);
       push({ title: 'Balasan terkirim', variant: 'success' });
-      reload();
     } catch (caught) {
       push({
         title: 'Gagal mengirim balasan',
@@ -199,7 +388,8 @@ export function PrivateMessage(): JSX.Element {
       setNotifyEmail('');
       setNotifyError(null);
       push({ title: 'Notifikasi aktif', description: 'Kamu dapat email setiap ada balasan.', variant: 'success' });
-      reload();
+      // Silent merge — the page never flashes back to a skeleton.
+      await refreshSilently();
     } catch (caught) {
       push({
         title: 'Gagal mengaktifkan',
@@ -215,6 +405,9 @@ export function PrivateMessage(): JSX.Element {
     return (
       <PublicLayout>
         <div className="mx-auto w-full max-w-xl">
+          <p className="mb-3 text-center text-sm font-semibold text-ink-muted animate-pulse">
+            Membuka pesanmu…
+          </p>
           <MessageSkeleton rows={3} />
         </div>
       </PublicLayout>

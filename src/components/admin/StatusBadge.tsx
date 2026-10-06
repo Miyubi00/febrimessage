@@ -7,7 +7,6 @@ const STATUS_STYLES: Record<MessageStatus, { label: string; className: string }>
   unread: { label: 'Unread', className: 'border-pastel-400 bg-pastel-100 text-pastel-800' },
   read: { label: 'Read', className: 'border-pastel-200 bg-white text-ink-muted' },
   hidden: { label: 'Hidden', className: 'border-slate-200 bg-slate-50 text-slate-500' },
-  spam: { label: 'Spam', className: 'border-amber-200 bg-amber-50 text-amber-600' },
   deleted: { label: 'Deleted', className: 'border-rose-200 bg-rose-50 text-rose-500' },
 };
 

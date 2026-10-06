@@ -1,4 +1,4 @@
-import { CornerDownRight, Globe, UserRound } from 'lucide-react';
+import { CornerDownRight, Link2Off, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { AdminMessageActions } from '@/components/admin/AdminMessageCard';
@@ -6,7 +6,6 @@ import { ReplyForm } from '@/components/admin/ReplyForm';
 import { ReplyStoryButton } from '@/components/admin/ReplyStoryButton';
 import { PrivateLinkBadge, StatusBadge, VisibilityBadge } from '@/components/admin/StatusBadge';
 import { AttachmentGrid } from '@/components/messages/AttachmentGrid';
-import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { toFriendlyMessage } from '@/lib/errors';
@@ -28,8 +27,6 @@ interface MessageDetailPanelProps {
   busy?: boolean;
   onClose: () => void;
   onDelete: (item: MessageWithMeta) => void;
-  onToggleRead: (item: MessageWithMeta) => void;
-  onMarkSpam: (item: MessageWithMeta) => void;
   onTogglePublic: (item: MessageWithMeta) => void;
   onReplied: (item: MessageWithMeta, reply: MessageRow) => void;
   onReopenList?: () => void;
@@ -44,8 +41,6 @@ export function MessageDetailPanel({
   busy = false,
   onClose,
   onDelete,
-  onToggleRead,
-  onMarkSpam,
   onTogglePublic,
   onReplied,
 }: MessageDetailPanelProps): JSX.Element | null {
@@ -53,28 +48,20 @@ export function MessageDetailPanel({
   const { push } = useToast();
 
   const [linkStatus, setLinkStatus] = useState<PrivateLinkStatus | null>(null);
-  const [linkLoading, setLinkLoading] = useState(false);
   const [linkBusy, setLinkBusy] = useState(false);
-  /** Token minted during this session — displayed once, then forgotten. */
-  const [freshToken, setFreshToken] = useState<string | null>(null);
 
   // Load the private-link state each time a different message opens.
   useEffect(() => {
-    setFreshToken(null);
     setLinkStatus(null);
     if (!open || !item) return;
 
     let cancelled = false;
-    setLinkLoading(true);
     fetchPrivateLinkStatus(item.message.id)
       .then((status) => {
         if (!cancelled) setLinkStatus(status);
       })
       .catch(() => {
         if (!cancelled) setLinkStatus(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLinkLoading(false);
       });
 
     return () => {
@@ -92,7 +79,6 @@ export function MessageDetailPanel({
 
   const handleRevoke = async (): Promise<void> => {
     setLinkBusy(true);
-    setFreshToken(null);
     try {
       await managePrivateLink(rootId, 'revoke');
       setLinkStatus((current) =>
@@ -107,40 +93,6 @@ export function MessageDetailPanel({
       });
     } finally {
       setLinkBusy(false);
-    }
-  };
-
-  const handleRotate = async (): Promise<void> => {
-    setLinkBusy(true);
-    try {
-      const { token } = await managePrivateLink(rootId, 'rotate');
-      setFreshToken(token);
-      const status = await fetchPrivateLinkStatus(rootId).catch(() => null);
-      if (status) setLinkStatus(status);
-      push({ title: 'Private link baru dibuat', description: 'Salin sekarang — hanya tampil sekali.', variant: 'success' });
-    } catch (caught) {
-      push({
-        title: 'Gagal membuat link baru',
-        description: toFriendlyMessage(caught, 'Coba lagi sebentar lagi.'),
-        variant: 'error',
-      });
-    } finally {
-      setLinkBusy(false);
-    }
-  };
-
-  const handleCopyFreshToken = async (): Promise<void> => {
-    if (!freshToken) return;
-    const url = `${window.location.origin}/message/${encodeURIComponent(freshToken)}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      push({ title: 'Link disalin', variant: 'success', duration: 2400 });
-    } catch {
-      push({
-        title: 'Gagal menyalin',
-        description: 'Salin link secara manual dari kolom di bawah.',
-        variant: 'error',
-      });
     }
   };
 
@@ -170,31 +122,28 @@ export function MessageDetailPanel({
             </span>
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-ink">{senderLabel}</p>
-              <p className="text-[11px] text-ink-muted">{formatDateTime(message.created_at)}</p>
+              {senderIp ? (
+                <p
+                  className="mt-1 inline-flex max-w-full items-center rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-semibold tracking-tight text-slate-500"
+                  title={`IP pengirim: ${senderIp}`}
+                >
+                  <span className="truncate">{senderIp}</span>
+                </p>
+              ) : null}
+              <p className="mt-0.5 text-[11px] text-ink-muted">{formatDateTime(message.created_at)}</p>
             </div>
             <div className="ml-auto flex flex-wrap items-center gap-1.5">
-              <StatusBadge status={message.status} />
-              <VisibilityBadge visibility={message.visibility} />
-              {linkStatus ? (
-                <PrivateLinkBadge
-                  state={linkStatus.revokedAt ? 'revoked' : linkStatus.hasToken ? 'active' : 'none'}
-                />
+              {message.status === 'hidden' || message.status === 'deleted' ? (
+                <StatusBadge status={message.status} />
               ) : null}
+              <VisibilityBadge visibility={message.visibility} />
+              {linkActive ? <PrivateLinkBadge state="active" /> : null}
             </div>
           </header>
 
           <p className="mt-3 whitespace-pre-wrap break-words rounded-3xl bg-white/80 p-4 text-sm leading-relaxed text-ink-soft">
             {message.content}
           </p>
-
-          {senderIp ? (
-            <p className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full bg-ink/85 px-2.5 py-1 font-mono text-[10px] font-semibold tracking-tight text-white">
-              <Globe className="h-3 w-3 shrink-0 opacity-70" aria-hidden="true" />
-              <span className="truncate" title={`IP pengirim: ${senderIp}`}>
-                IP: {senderIp}
-              </span>
-            </p>
-          ) : null}
 
           <AttachmentGrid attachments={attachments} className="mt-3" />
         </section>
@@ -258,59 +207,25 @@ export function MessageDetailPanel({
           replying={replying}
           onToggleReply={() => setReplying((value) => !value)}
           onDelete={() => onDelete(item)}
-          onToggleRead={() => onToggleRead(item)}
-          onMarkSpam={() => onMarkSpam(item)}
           onTogglePublic={() => onTogglePublic(item)}
+          deleteInMenu
           storyButton={
             profile ? <ReplyStoryButton message={message.content} profile={profile} /> : null
           }
           moreItems={
-            <div className="border-t border-pastel-100 px-3 py-2.5">
-              <p className="text-xs font-semibold text-ink">
-                Private link:{' '}
-                <span className={linkActive ? 'text-pastel-700' : 'text-ink-muted'}>
-                  {linkLoading ? '…' : linkActive ? 'Aktif' : linkStatus?.revokedAt ? 'Dicabut' : 'Belum ada'}
-                </span>
-              </p>
-
-              {freshToken ? (
-                <div className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 p-2.5">
-                  <p className="text-[11px] leading-relaxed text-amber-700">
-                    Hanya tampil sekali — salin sekarang.
-                  </p>
-                  <div className="mt-1.5 flex items-center gap-1.5">
-                    <code className="min-w-0 flex-1 truncate rounded-xl bg-white px-2 py-1.5 font-mono text-[10px] text-ink">
-                      {`${window.location.origin}/message/${freshToken}`}
-                    </code>
-                    <Button size="sm" variant="secondary" onClick={() => void handleCopyFreshToken()}>
-                      Salin
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => void handleRotate()}
+            linkActive ? (
+              <div className="border-t border-pastel-100 px-1.5 py-1.5">
+                <button
+                  type="button"
+                  onClick={() => void handleRevoke()}
                   disabled={linkBusy}
+                  className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-left text-xs font-semibold text-rose-500 transition hover:bg-rose-50 disabled:opacity-50"
                 >
-                  {linkStatus?.hasToken ? 'Buat link baru' : 'Buat link'}
-                </Button>
-                {linkActive ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => void handleRevoke()}
-                    disabled={linkBusy}
-                    className="text-rose-500 hover:text-rose-600"
-                  >
-                    Revoke
-                  </Button>
-                ) : null}
+                  <Link2Off className="h-3.5 w-3.5" aria-hidden="true" />
+                  {linkBusy ? 'Mencabut…' : 'Cabut link'}
+                </button>
               </div>
-            </div>
+            ) : undefined
           }
         />
       </div>

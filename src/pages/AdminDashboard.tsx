@@ -1,7 +1,7 @@
 import { Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, Outlet, useOutletContext } from 'react-router-dom';
-
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { AdminBottomNav } from '@/components/admin/AdminBottomNav';
 import { useToast } from '@/components/ui/Toast';
 import { fetchUnreadCount } from '@/services/adminService';
@@ -10,15 +10,25 @@ import { logDevError } from '@/lib/errors';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 import { AdminLayout } from '@/layouts/AdminLayout';
+import type { MessageRow } from '@/types/database';
 import type { Profile } from '@/types/profile';
+
+/** One realtime row event, delivered to outlet pages for targeted UI updates. */
+export interface LiveMessageEvent {
+  seq: number;
+  payload: RealtimePostgresChangesPayload<MessageRow>;
+}
 
 export interface AdminOutletContext {
   profile: Profile | null;
   unreadCount: number;
   /** Increments whenever a realtime INSERT arrives (pages can refetch on change). */
   newMessageToken: number;
+  /** Latest realtime row event (pages apply it without a full refetch). */
+  liveEvent: LiveMessageEvent | null;
   loadingProfile: boolean;
   reloadProfile: () => void;
+  refreshUnread: () => void;
 }
 
 export function useAdminOutlet(): AdminOutletContext {
@@ -40,6 +50,7 @@ export function AdminDashboard(): JSX.Element {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
   const [newMessageToken, setNewMessageToken] = useState(0);
+  const [liveEvent, setLiveEvent] = useState<LiveMessageEvent | null>(null);
 
   const adminId = admin?.userId ?? null;
 
@@ -79,12 +90,14 @@ export function AdminDashboard(): JSX.Element {
     includeUpdates: true,
     accessToken: session?.access_token ?? null,
     onChange: (payload) => {
+      // Deliver the raw event so pages can patch their lists directly.
+      setLiveEvent((previous) => ({ seq: (previous?.seq ?? 0) + 1, payload }));
       if (payload.eventType === 'INSERT') {
         const row = payload.new as { parent_id?: string | null } | undefined;
         // Any new row (message or reply) refreshes counters + lists.
         setNewMessageToken((token) => token + 1);
         // Only root messages pop a notification — replies are visible when the
-        // thread is opened (or after the next list refresh).
+        // thread is opened (or arrive through the live event patch).
         if (row?.parent_id) return;
         push({
           title: 'Pesan baru masuk',
@@ -100,8 +113,8 @@ export function AdminDashboard(): JSX.Element {
   });
 
   const context = useMemo<AdminOutletContext>(
-    () => ({ profile, unreadCount, newMessageToken, loadingProfile, reloadProfile }),
-    [profile, unreadCount, newMessageToken, loadingProfile, reloadProfile],
+    () => ({ profile, unreadCount, newMessageToken, liveEvent, loadingProfile, reloadProfile, refreshUnread }),
+    [profile, unreadCount, newMessageToken, liveEvent, loadingProfile, reloadProfile, refreshUnread],
   );
 
   if (loading) {

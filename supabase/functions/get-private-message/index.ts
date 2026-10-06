@@ -148,8 +148,8 @@ Deno.serve(async (request: Request): Promise<Response> => {
       return apiError(request, 500, 'LOOKUP_FAILED', 'Gagal memuat pesan. Coba lagi.');
     }
 
-    // A deleted/spam thread is treated as gone for the sender too.
-    if (!root || root.status === 'deleted' || root.status === 'spam') {
+    // A deleted thread is treated as gone for the sender too.
+    if (!root || root.status === 'deleted') {
       return apiError(request, 404, 'NOT_FOUND', NOT_FOUND_MESSAGE);
     }
 

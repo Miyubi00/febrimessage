@@ -34,14 +34,19 @@
   <body>
     <div id="root"></div>
     <script>
-      // Apply the persisted admin theme before first paint (admin routes only,
-      // so the public page never inherits it). useAdminTheme takes over after.
+      // Apply the persisted theme before first paint so loading skeletons,
+      // toasts and portals render in the correct theme immediately (no
+      // light-mode flash). Admin routes use data-admin-theme; the public page
+      // mirrors its profile theme via data-theme. React takes over after.
       try {
         if (location.pathname.indexOf('/admin') === 0) {
           document.documentElement.setAttribute(
             'data-admin-theme',
             localStorage.getItem('admin-theme') === 'dark' ? 'dark' : 'light',
           );
+        } else {
+          var stored = localStorage.getItem('public-theme');
+          if (stored) document.documentElement.setAttribute('data-theme', stored);
         }
       } catch (e) {}
     </script>

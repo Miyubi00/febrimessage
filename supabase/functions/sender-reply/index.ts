@@ -90,7 +90,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
       console.error('[sender-reply] root lookup failed:', rootError.message);
       return apiError(request, 500, 'LOOKUP_FAILED', 'Gagal mengirim balasan. Coba lagi.');
     }
-    if (!root || root.status === 'deleted' || root.status === 'spam') {
+    if (!root || root.status === 'deleted') {
       return apiError(request, 404, 'NOT_FOUND', NOT_FOUND_MESSAGE);
     }
 

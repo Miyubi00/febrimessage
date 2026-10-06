@@ -47,8 +47,40 @@ export function useRealtimeMessages({
 
     let channel: RealtimeChannel | null = null;
     let cancelled = false;
+    let retryTimer: number | null = null;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 5;
+
+    const clearRetry = (): void => {
+      if (retryTimer !== null) {
+        window.clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+    };
+
+    const scheduleRetry = (): void => {
+      if (cancelled || attempts >= MAX_ATTEMPTS) return;
+      // Exponential backoff: 1s, 2s, 4s, 8s, 16s — never a rapid retry loop.
+      const delay = Math.min(1000 * 2 ** attempts, 16000);
+      attempts += 1;
+      retryTimer = window.setTimeout(() => {
+        retryTimer = null;
+        if (!cancelled) void subscribe();
+      }, delay);
+    };
+
+    const teardownChannel = (): void => {
+      if (channel) {
+        const stale = channel;
+        channel = null;
+        void supabase.removeChannel(stale).catch(() => undefined);
+      }
+    };
 
     const subscribe = async (): Promise<void> => {
+      if (cancelled) return;
+      teardownChannel();
+
       try {
         // Make sure the socket carries the current JWT so RLS applies to
         // replicated rows (important for the admin inbox).
@@ -98,9 +130,15 @@ export function useRealtimeMessages({
 
       channel.subscribe((status) => {
         if (cancelled) return;
-        setConnected(status === 'SUBSCRIBED');
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          logDevError('useRealtimeMessages', `channel status: ${status}`);
+        if (status === 'SUBSCRIBED') {
+          attempts = 0;
+          setConnected(true);
+          return;
+        }
+        setConnected(false);
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          logDevError('useRealtimeMessages', `channel status: ${status} (retry ${attempts + 1})`);
+          scheduleRetry();
         }
       });
     };
@@ -109,6 +147,7 @@ export function useRealtimeMessages({
 
     return () => {
       cancelled = true;
+      clearRetry();
       setConnected(false);
       if (channel) void supabase.removeChannel(channel);
     };

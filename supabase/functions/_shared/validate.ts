@@ -9,7 +9,7 @@ export const USERNAME_REGEX = /^[a-z0-9_]{3,30}$/;
 export const SENDER_NAME_MAX = 20;
 export const MESSAGE_MAX = 100;
 export const REPLY_MAX = 300;
-export const MAX_ATTACHMENTS = 3;
+export const MAX_ATTACHMENTS = 1;
 export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 
 export const ALLOWED_IMAGE_MIME_TYPES: readonly AllowedImageMime[] = [

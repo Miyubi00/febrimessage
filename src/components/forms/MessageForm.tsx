@@ -1,12 +1,12 @@
-import { Copy, ExternalLink, ImagePlus, Mail, Send, User } from 'lucide-react';
+import { ImagePlus, Mail, Send, User } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { AttachmentPreviews } from '@/components/forms/AttachmentPreviews';
 import { CaptchaField } from '@/components/forms/CaptchaField';
 import { Button } from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Input } from '@/components/ui/Input';
-import { Modal } from '@/components/ui/Modal';
 import { Textarea } from '@/components/ui/Textarea';
 import { useToast } from '@/components/ui/Toast';
 import { retryAfterOf, toFriendlyMessage } from '@/lib/errors';
@@ -23,7 +23,7 @@ import {
   validateMessageContent,
   validateSenderName,
 } from '@/lib/validation';
-import { submitMessage, privateThreadUrl } from '@/services/messageService';
+import { submitMessage } from '@/services/messageService';
 import type { StagedAttachment } from '@/types/message';
 import type { Profile } from '@/types/profile';
 
@@ -48,6 +48,7 @@ function newId(): string {
  */
 export function MessageForm({ profile, onSent, className }: MessageFormProps): JSX.Element {
   const { push } = useToast();
+  const navigate = useNavigate();
 
   const [senderName, setSenderName] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
@@ -62,9 +63,6 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [clock, setClock] = useState(() => Date.now());
   const fileInputRef = useRef<HTMLInputElement>(null);
-  /** Raw private token from the last successful send — in-memory only (spec 45). */
-  const [sentToken, setSentToken] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const cooldownSeconds = Math.max(0, Math.ceil((cooldownUntil - clock) / 1000));
   const coolingDown = cooldownSeconds > 0;
@@ -85,52 +83,67 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
   const handleFiles = async (files: FileList | null): Promise<void> => {
     if (!files || files.length === 0) return;
 
-    const slots = MAX_ATTACHMENTS - attachments.length;
-    if (slots <= 0) {
+    // One photo per message — never auto-replace without confirmation.
+    if (attachments.length >= MAX_ATTACHMENTS) {
       push({
-        title: `Maksimal ${MAX_ATTACHMENTS} gambar`,
-        description: 'Hapus salah satu lampiran dulu ya.',
+        title: 'Pesan hanya dapat memiliki satu foto.',
+        description: 'Hapus foto yang ada dulu kalau mau menggantinya.',
         variant: 'info',
       });
       return;
     }
 
-    const chosen = Array.from(files).slice(0, slots);
+    const file = files[0];
+    if (!file) return;
 
-    for (const file of chosen) {
-      const id = newId();
-      const previewUrl = URL.createObjectURL(file);
-      setAttachments((previous) => [
-        ...previous,
-        { id, file, previewUrl, progress: 0, status: 'uploading', error: null, remote: null },
-      ]);
+    const id = newId();
+    const previewUrl = URL.createObjectURL(file);
+    setAttachments((previous) => [
+      ...previous,
+      { id, file, previewUrl, progress: 0, status: 'uploading', error: null, remote: null },
+    ]);
 
-      try {
-        const remote = await uploadPendingAttachment(file, (percent) => {
-          setAttachments((previous) =>
-            previous.map((item) => (item.id === id ? { ...item, progress: percent } : item)),
-          );
-        });
+    await runUpload(id, file);
+  };
 
+  /** Upload (or re-upload, reusing the in-memory File) for one staged photo. */
+  const runUpload = async (id: string, file: File): Promise<void> => {
+    try {
+      const remote = await uploadPendingAttachment(file, (percent) => {
         setAttachments((previous) =>
-          previous.map((item) =>
-            item.id === id ? { ...item, status: 'uploaded', progress: 100, remote } : item,
-          ),
+          previous.map((item) => (item.id === id ? { ...item, progress: percent } : item)),
         );
-      } catch (caught) {
-        const message = toFriendlyMessage(caught, 'Gagal mengunggah gambar. Coba lagi.');
-        setAttachments((previous) =>
-          previous.map((item) =>
-            item.id === id ? { ...item, status: 'error', error: message } : item,
-          ),
-        );
+      });
 
-        const retryAfter = retryAfterOf(caught);
-        if (retryAfter) setCooldownUntil(Date.now() + retryAfter * 1000);
+      setAttachments((previous) =>
+        previous.map((item) =>
+          item.id === id ? { ...item, status: 'uploaded', progress: 100, remote } : item,
+        ),
+      );
+    } catch (caught) {
+      const message = toFriendlyMessage(caught, 'Gagal mengunggah gambar. Coba lagi.');
+      setAttachments((previous) =>
+        previous.map((item) =>
+          item.id === id ? { ...item, status: 'error', error: message } : item,
+        ),
+      );
 
-        push({ title: 'Upload gagal', description: message, variant: 'error' });
-      }
+      const retryAfter = retryAfterOf(caught);
+      if (retryAfter) setCooldownUntil(Date.now() + retryAfter * 1000);
+
+      push({ title: 'Upload gagal', description: message, variant: 'error' });
     }
+  };
+
+  const retryUpload = (id: string): void => {
+    const target = attachments.find((item) => item.id === id);
+    if (!target || target.status !== 'error') return;
+    setAttachments((previous) =>
+      previous.map((item) =>
+        item.id === id ? { ...item, status: 'uploading', progress: 0, error: null } : item,
+      ),
+    );
+    void runUpload(id, target.file);
   };
 
   const removeAttachment = (id: string): void => {
@@ -141,14 +154,7 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
     });
   };
 
-  /** Dismiss the success popup (the token stays in memory until then). */
-  const closeSuccess = (): void => {
-    setSentToken(null);
-    setCopied(false);
-  };
-
-  const resetForm = (): void => {
-    setSenderName('');
+  const resetForm = (): void => {    setSenderName('');
     setContent('');
     setIsAnonymous(false);
     setSenderError(null);
@@ -202,15 +208,17 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
 
       push({
         title: 'Pesan berhasil dikirim!',
-        description: 'Terima kasih, pesanmu sudah masuk 💙',
+        description: 'Mengarahkan ke pesanmu…',
         variant: 'success',
+        duration: 6000,
       });
-      // Keep the raw token ONLY in memory so the sender can open/copy their
-      // private link once (a refresh forgets it, per spec 45).
-      setSentToken(result.private_token ?? null);
-      setCopied(false);
       resetForm();
       onSent?.();
+      // Jump straight to the private thread — the toast above travels along
+      // because the ToastProvider lives at the app root.
+      if (result.private_token) {
+        navigate(`/message/${encodeURIComponent(result.private_token)}`);
+      }
     } catch (caught) {
       const retryAfter = retryAfterOf(caught);
       if (retryAfter) {
@@ -266,7 +274,6 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
         ref={fileInputRef}
         type="file"
         accept={ACCEPT_IMAGE_ATTR}
-        multiple
         className="sr-only"
         aria-hidden="true"
         tabIndex={-1}
@@ -328,12 +335,9 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
           >
             Tambahkan foto
           </Button>
-          <span className="hint-text">
-            {attachments.length}/{MAX_ATTACHMENTS} gambar • maks 5MB
-          </span>
         </div>
 
-        <AttachmentPreviews items={attachments} onRemove={removeAttachment} />
+        <AttachmentPreviews items={attachments} onRemove={removeAttachment} onRetry={retryUpload} />
 
         <CaptchaField onToken={handleCaptchaToken} resetKey={captchaResetKey} />
       </div>
@@ -350,59 +354,6 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
       >
         {coolingDown ? `Coba lagi dalam ${formatRetryAfter(cooldownSeconds)}` : 'Kirim'}
       </Button>
-
-      <Modal
-        open={sentToken !== null}
-        onClose={closeSuccess}
-        title="Pesan berhasil dikirim!"
-        description="Tautan ini digunakan untuk melihat balasan jika pemilik membalas pesanmu. Simpan baik-baik dan jangan bagikan kalau pesanmu bersifat private."
-        footer={
-          <Button type="button" variant="secondary" onClick={closeSuccess}>
-            Tutup
-          </Button>
-        }
-      >
-        {sentToken ? (
-          <div>
-            <div className="flex items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded-2xl bg-white px-3 py-2.5 font-mono text-[11px] text-ink">
-                {privateThreadUrl(sentToken)}
-              </code>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                leftIcon={<Copy className="h-3.5 w-3.5" aria-hidden="true" />}
-                onClick={() => {
-                  void navigator.clipboard
-                    .writeText(privateThreadUrl(sentToken))
-                    .then(() => {
-                      setCopied(true);
-                      push({ title: 'Link disalin', variant: 'success', duration: 2400 });
-                    })
-                    .catch(() => {
-                      push({
-                        title: 'Gagal menyalin',
-                        description: 'Salin link secara manual dari kolom di atas.',
-                        variant: 'error',
-                      });
-                    });
-                }}
-              >
-                {copied ? 'Disalin ✓' : 'Salin link'}
-              </Button>
-              <a
-                href={privateThreadUrl(sentToken)}
-                className="inline-flex h-9 items-center gap-1.5 rounded-2xl bg-pastel-400 px-3.5 text-xs font-semibold text-white shadow-soft transition hover:bg-pastel-500"
-              >
-                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                Lihat pesan
-              </a>
-            </div>
-          </div>
-        ) : null}
-      </Modal>
     </form>
   );
 }
