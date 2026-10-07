@@ -352,8 +352,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
           subject: `Pesan anonim baru dari ${senderLabel}`,
           html: emailShell(
             'Pesan anonim baru',
-            `<p><strong>${escapeHtml(senderLabel)}</strong> baru saja mengirim pesan. Buka inbox admin untuk membaca dan membalasnya.</p>` +
-              `<blockquote style="border-left:3px solid #A9D8FF;padding-left:12px;color:#3D5A80">${escapeHtml(content.slice(0, 300))}</blockquote>`,
+             `<blockquote style="border-left:3px solid #A9D8FF;padding-left:12px;color:#3D5A80;margin:0;font-size:16px">${escapeHtml(content.slice(0, 300))}</blockquote>`,
           ),
         });
         console.log(`[submit-message] admin email notify: ${sent ? 'sent' : 'skipped'}`);

@@ -99,12 +99,26 @@ function htmlToText(html: string): string {
 }
 /** Tiny brand wrapper so every notification looks like the product. */
 export function emailShell(title: string, body: string): string {
+  // Inline styles + table layout so the card renders everywhere (Gmail/Outlook)
+  // and matches the in-app story card: pastel blue header, white body.
   return [
-    '<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1E3A5F">',
-    `<h2 style="margin:0 0 12px;font-size:20px">${title}</h2>`,
-    `<div style="font-size:14px;line-height:1.6">${body}</div>`,
-    '<p style="margin:20px 0 0;font-size:12px;color:#7191B4">AnonMessage — pesan anonim</p>',
-    '</div>',
+    '<!doctype html>',
+    '<html lang="id"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /></head>',
+    '<body style="margin:0;padding:24px;background:#EAF6FF;font-family:Arial,Helvetica,sans-serif">',
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">',
+    '<tr><td align="center">',
+    '<table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#FFFFFF;border-radius:24px;overflow:hidden;box-shadow:0 12px 32px -12px rgba(94,168,255,0.55)">',
+    '<tr><td align="center" style="padding:26px 32px 20px;background:linear-gradient(135deg,#5EA8FF 0%,#A5A9F5 100%)">',
+    '<p style="margin:0;font-size:11px;font-weight:bold;letter-spacing:2px;color:#FFFFFF">ANONMESSAGE</p>',
+    `<h1 style="margin:10px 0 0;font-size:22px;font-weight:bold;color:#FFFFFF">${title}</h1>`,
+    '</td></tr>',
+    `<tr><td style="padding:26px 32px;font-size:14px;line-height:1.7;color:#334155">${body}</td></tr>`,
+    '<tr><td style="padding:18px 32px;background:#F7FBFF;font-size:11px;color:#7191B4;text-align:center">',
+    'Dikirim otomatis oleh AnonMessage. Jangan balas email ini.',
+    '</td></tr>',
+    '</table>',
+    '</td></tr></table>',
+    '</body></html>',
   ].join('');
 }
 

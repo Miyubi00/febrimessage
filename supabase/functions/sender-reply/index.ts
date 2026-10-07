@@ -9,8 +9,10 @@
  * answering something. Otherwise 409 (the reply button disappears
  * client-side under the same rule).
  */
-import { serviceClient } from '../_shared/clients.ts';
+import { getAppSetting, resolveDiscordWebhookUrl, serviceClient } from '../_shared/clients.ts';
 import { preflight } from '../_shared/cors.ts';
+import { sendDiscordNotification } from '../_shared/discord.ts';
+import { emailShell, escapeHtml, isPlausibleEmail, sendEmail } from '../_shared/email.ts';
 import { clientIp, hashIp } from '../_shared/ipHash.ts';
 import { hashPrivateToken, looksLikePrivateToken } from '../_shared/privateToken.ts';
 import { enforceRateLimit } from '../_shared/rateLimit.ts';
@@ -143,6 +145,50 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
     if (bumpError) {
       console.error('[sender-reply] bump failed:', bumpError.message);
+    }
+
+    const rawIp = clientIp(request);
+    const senderLabel = root.is_anonymous ? 'Anonymous' : ((root.sender_name as string | null) || 'Anonymous');
+
+    // Discord notification — best effort, never blocks the response.
+    try {
+      const discordEnabled = (await getAppSetting(client, 'discord_enabled', 'false')).trim().toLowerCase() === 'true';
+      if (discordEnabled) {
+        const includeIp = (await getAppSetting(client, 'discord_include_ip', 'true')).trim().toLowerCase() !== 'false';
+        const webhook = await resolveDiscordWebhookUrl(client);
+        const discordStatus = await sendDiscordNotification({
+          senderLabel,
+          content,
+          senderIp: rawIp,
+          includeIp,
+          messageId: created.id as string,
+          attachmentCount: 0,
+          webhookUrl: webhook.url,
+        });
+        console.log(`[sender-reply] discord notify: ${discordStatus} (${webhook.source})`);
+      }
+    } catch (discordError) {
+      console.error('[sender-reply] discord notify threw:', discordError instanceof Error ? discordError.message : discordError);
+    }
+
+    // Admin email notification — best effort, never blocks the response.
+    try {
+      const emailEnabled =
+        (await getAppSetting(client, 'email_notifications_enabled', 'false')).trim().toLowerCase() === 'true';
+      const adminEmail = (await getAppSetting(client, 'admin_notify_email', '')).trim();
+      if (emailEnabled && isPlausibleEmail(adminEmail)) {
+        const sent = await sendEmail({
+          to: adminEmail,
+          subject: `Balasan via private link dari ${senderLabel}`,
+          html: emailShell(
+            'Balasan via private link',
+             `<blockquote style="border-left:3px solid #A9D8FF;padding-left:12px;color:#3D5A80;margin:0;font-size:16px">${escapeHtml(content.slice(0, 300))}</blockquote>`,
+          ),
+        });
+        console.log(`[sender-reply] admin email notify: ${sent ? 'sent' : 'skipped'}`);
+      }
+    } catch (emailError) {
+      console.error('[sender-reply] admin email notify threw:', emailError instanceof Error ? emailError.message : emailError);
     }
 
     return json(request, {
