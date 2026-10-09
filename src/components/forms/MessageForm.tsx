@@ -235,7 +235,7 @@ export function MessageForm({ profile, onSent, className }: MessageFormProps): J
   return (
     <form
       onSubmit={handleSubmit}
-      className={cn('surface-soft relative flex h-full flex-col p-5 sm:p-6', className)}
+      className={cn('surface-soft relative flex flex-col p-5 sm:p-6', className)}
       noValidate
     >
       <header className="flex shrink-0 items-start gap-3">

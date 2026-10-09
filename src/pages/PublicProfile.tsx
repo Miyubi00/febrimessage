@@ -85,12 +85,10 @@ export function PublicProfile(): JSX.Element {
             <ProfileHeader profile={profile} />
           </Card>
 
-          {/* MessageForm already renders its own surface card — no extra Card. */}
-          <MessageForm
-            profile={profile}
-            onSent={refreshMessages}
-            className="min-h-0 flex-1"
-          />
+          {/* MessageForm already renders its own surface card — no extra Card.
+              Let it size to its content so the column scrolls instead of the
+              form stretching (mobile overlap) or collapsing (short screens). */}
+          <MessageForm profile={profile} onSent={refreshMessages} className="shrink-0" />
         </div>
 
         <Card padding="md" className="flex min-h-0 flex-col lg:h-full">

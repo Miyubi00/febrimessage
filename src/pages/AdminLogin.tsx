@@ -204,8 +204,10 @@ export function AdminLogin(): JSX.Element {
 
         <p className="mt-5 flex items-start gap-2 rounded-3xl bg-pastel-50/80 px-4 py-3 text-[11px] leading-relaxed text-ink-muted">
           <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-pastel-500" aria-hidden="true" />
-          Login hanya untuk akun yang terdaftar di tabel <code>admin_profiles</code>. Akun biasa tidak akan bisa
-          mengakses panel ini.
+          <span>
+            Login hanya untuk akun yang terdaftar di tabel <code>admin_profiles</code>. Akun biasa tidak akan bisa
+            mengakses panel ini.
+          </span>
         </p>
       </Card>
     </main>
